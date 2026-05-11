@@ -463,6 +463,14 @@ macro_rules! app_invoke_handler {
             commands::list_views,
             commands::save_view_cmd,
             commands::delete_view_cmd,
+            commands::spec_list_specs,
+            commands::spec_get_spec,
+            commands::spec_get_refinement_graph,
+            commands::spec_get_categorization_graph,
+            commands::spec_get_coverage,
+            commands::spec_get_lint_results,
+            commands::spec_get_history,
+            commands::spec_list_tasks,
             vault_watcher::start_vault_watcher,
             vault_watcher::stop_vault_watcher
         ]
