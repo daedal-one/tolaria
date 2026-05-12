@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { SpecSummary } from '@/utils/specs/types'
 import { listSpecs } from '@/utils/specs/api'
 import { SpecStatusBadge } from './SpecStatusBadge'
@@ -14,19 +14,22 @@ export function SpecOverview({ specsDir }: SpecOverviewProps) {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
 
-  const load = useCallback(async () => {
-    try {
-      const data = await listSpecs(specsDir)
-      setSpecs(data)
-      setError(null)
-    } catch (e) {
-      setError(String(e))
+  useEffect(() => {
+    let cancelled = false
+    listSpecs(specsDir)
+      .then((data) => {
+        if (!cancelled) {
+          setSpecs(data)
+          setError(null)
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e))
+      })
+    return () => {
+      cancelled = true
     }
   }, [specsDir])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   const filtered = filter
     ? specs.filter(

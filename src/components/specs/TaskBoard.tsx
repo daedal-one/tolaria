@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TaskEntry } from '@/utils/specs/types'
 import { listTasks } from '@/utils/specs/api'
 import { TaskProgressBadge } from './TaskProgressBadge'
@@ -20,19 +20,22 @@ export function TaskBoard({ specsDir }: TaskBoardProps) {
   const [tasks, setTasks] = useState<TaskEntry[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      const data = await listTasks(specsDir, 'all')
-      setTasks(data)
-      setError(null)
-    } catch (e) {
-      setError(String(e))
+  useEffect(() => {
+    let cancelled = false
+    listTasks(specsDir, 'all')
+      .then((data) => {
+        if (!cancelled) {
+          setTasks(data)
+          setError(null)
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e))
+      })
+    return () => {
+      cancelled = true
     }
   }, [specsDir])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   if (error) {
     return <div className="p-4 text-sm text-red-600">Error loading tasks: {error}</div>

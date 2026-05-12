@@ -379,3 +379,105 @@ pub fn spec_list_tasks(
 
     Ok(tasks)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture_path() -> String {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../../example/.specs").to_string()
+    }
+
+    #[test]
+    fn list_specs_returns_example_fixture() {
+        let summaries = spec_list_specs(fixture_path()).expect("list_specs failed");
+        assert!(summaries.len() >= 6, "expected >=6 specs, got {}", summaries.len());
+
+        let ids: Vec<&str> = summaries.iter().map(|s| s.id.as_str()).collect();
+        assert!(ids.contains(&"REQ:auth/session-expiry"));
+        assert!(ids.contains(&"ADR:auth/0001-session-storage"));
+        assert!(ids.contains(&"INV:auth/no-stale-tokens"));
+
+        let req = summaries
+            .iter()
+            .find(|s| s.id == "REQ:auth/session-expiry")
+            .unwrap();
+        assert_eq!(req.entity_type, "requirement");
+        assert_eq!(req.status, "draft");
+        assert_eq!(req.level.as_deref(), Some("MUST"));
+    }
+
+    #[test]
+    fn get_spec_full_payload() {
+        let full = spec_get_spec(fixture_path(), "REQ:auth/session-expiry".to_string())
+            .expect("get_spec failed");
+        assert_eq!(full.id, "REQ:auth/session-expiry");
+        assert!(full.body.contains("Session expiry policy"));
+        assert!(!full.refines.is_empty());
+    }
+
+    #[test]
+    fn refinement_graph_has_nodes_and_edges() {
+        let graph = spec_get_refinement_graph(fixture_path()).expect("refinement graph failed");
+        assert!(!graph.nodes.is_empty());
+        assert!(!graph.edges.is_empty());
+
+        // session-expiry refines session-management
+        let has_refines_edge = graph.edges.iter().any(|e| {
+            e.from == "REQ:auth/session-expiry" && e.to.starts_with("REQ:auth/session-management")
+        });
+        assert!(has_refines_edge, "missing session-expiry → session-management edge");
+    }
+
+    #[test]
+    fn categorization_graph_has_topic_edges() {
+        let graph = spec_get_categorization_graph(fixture_path())
+            .expect("categorization graph failed");
+        assert!(!graph.nodes.is_empty());
+        // session-expiry is categorized under TOPIC:topics/auth
+        let has_topic_edge = graph
+            .edges
+            .iter()
+            .any(|e| e.from == "REQ:auth/session-expiry" && e.to == "TOPIC:topics/auth");
+        assert!(has_topic_edge, "missing categorization edge to TOPIC:topics/auth");
+    }
+
+    #[test]
+    fn coverage_returns_clauses() {
+        let coverage = spec_get_coverage(
+            fixture_path(),
+            "REQ:auth/session-management".to_string(),
+        )
+        .expect("coverage failed");
+        assert!(!coverage.is_empty(), "expected at least one clause");
+        let ids: Vec<&str> = coverage.iter().map(|c| c.clause_id.as_str()).collect();
+        assert!(ids.iter().any(|id| id.contains("c-lifetime")));
+    }
+
+    #[test]
+    fn lint_results_include_r018_and_r019() {
+        let diags = spec_get_lint_results(fixture_path()).expect("lint failed");
+        let codes: Vec<&str> = diags.iter().map(|d| d.code.as_str()).collect();
+        assert!(codes.contains(&"R018"), "expected R018 in {codes:?}");
+        assert!(codes.contains(&"R019"), "expected R019 in {codes:?}");
+
+        let r018 = diags.iter().find(|d| d.code == "R018").unwrap();
+        assert_eq!(r018.severity, "error");
+
+        let r019 = diags.iter().find(|d| d.code == "R019").unwrap();
+        assert_eq!(r019.severity, "warning");
+    }
+
+    #[test]
+    fn list_tasks_handles_missing_state() {
+        // The example fixture has no TASK entries, so this should be an empty list.
+        let tasks = spec_list_tasks(fixture_path(), None).expect("list_tasks failed");
+        assert!(tasks.is_empty() || tasks.iter().all(|t| !t.id.is_empty()));
+    }
+
+    #[test]
+    fn unknown_spec_returns_error() {
+        let result = spec_get_spec(fixture_path(), "REQ:nope/does-not-exist".to_string());
+        assert!(result.is_err());
+    }
+}

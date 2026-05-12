@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { LintDiagnostic } from '@/utils/specs/types'
 import { getLintResults } from '@/utils/specs/api'
 
@@ -16,19 +16,22 @@ export function LintResults({ specsDir }: LintResultsProps) {
   const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      const data = await getLintResults(specsDir)
-      setDiagnostics(data)
-      setError(null)
-    } catch (e) {
-      setError(String(e))
+  useEffect(() => {
+    let cancelled = false
+    getLintResults(specsDir)
+      .then((data) => {
+        if (!cancelled) {
+          setDiagnostics(data)
+          setError(null)
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e))
+      })
+    return () => {
+      cancelled = true
     }
   }, [specsDir])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   if (error) {
     return <div className="p-4 text-sm text-red-600">Error running lint: {error}</div>
