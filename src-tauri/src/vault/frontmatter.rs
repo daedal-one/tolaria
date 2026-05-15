@@ -1,5 +1,6 @@
 use crate::frontmatter::keys::{canonical_known_frontmatter_key, FrontmatterKey};
 use crate::vault::parsing::contains_wikilink;
+use crate::vault::spec_refs::{collect_spec_entity_targets, extract_spec_id};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -231,7 +232,11 @@ fn parse_frontmatter(data: &HashMap<String, serde_json::Value>, raw_content: &st
     serde_json::from_value(value).unwrap_or_default()
 }
 
-/// Extract all wikilink-containing fields from raw YAML frontmatter.
+/// Extract all wikilink- or spec-reference-bearing fields from raw YAML
+/// frontmatter. Wikilinks are preserved verbatim (with `[[...]]`); spec
+/// references (e.g. `REQ:auth/foo`) are stored as bare IDs. The two shapes
+/// can coexist under a single field — both contribute to the same target
+/// list.
 pub(crate) fn extract_relationships(
     data: &HashMap<String, serde_json::Value>,
 ) -> HashMap<String, Vec<String>> {
@@ -242,9 +247,15 @@ pub(crate) fn extract_relationships(
             continue;
         }
 
-        let wikilinks = relationship_wikilinks(value);
-        if !wikilinks.is_empty() {
-            relationships.insert(key.clone(), wikilinks);
+        let mut targets = relationship_wikilinks(value);
+        let spec_targets = collect_spec_entity_targets(value);
+        for target in spec_targets {
+            if !targets.contains(&target) {
+                targets.push(target);
+            }
+        }
+        if !targets.is_empty() {
+            relationships.insert(key.clone(), targets);
         }
     }
 
@@ -304,7 +315,9 @@ pub(crate) fn extract_properties(
             serde_json::Value::Null => {
                 properties.insert(key.clone(), value.clone());
             }
-            serde_json::Value::String(s) if !contains_wikilink(s) => {
+            serde_json::Value::String(s)
+                if !contains_wikilink(s) && extract_spec_id(s).is_none() =>
+            {
                 properties.insert(key.clone(), value.clone());
             }
             serde_json::Value::Number(_) | serde_json::Value::Bool(_) => {
@@ -314,7 +327,7 @@ pub(crate) fn extract_properties(
             // This ensures YAML like "Owner: [Luca]" or "Owner:\n  - Luca" works correctly.
             serde_json::Value::Array(arr) => {
                 if let [serde_json::Value::String(s)] = arr.as_slice() {
-                    if !contains_wikilink(s) {
+                    if !contains_wikilink(s) && extract_spec_id(s).is_none() {
                         properties.insert(key.clone(), serde_json::Value::String(s.clone()));
                     }
                 }

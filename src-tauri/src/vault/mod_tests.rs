@@ -36,6 +36,8 @@ mod real_vault_consistency;
 mod relationships;
 #[path = "mod_tests/scan_and_file_access.rs"]
 mod scan_and_file_access;
+#[path = "mod_tests/spec_refs.rs"]
+mod spec_refs;
 #[path = "mod_tests/type_and_links.rs"]
 mod type_and_links;
 

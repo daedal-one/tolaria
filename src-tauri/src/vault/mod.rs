@@ -13,6 +13,7 @@ mod migration;
 mod parsing;
 pub(crate) mod path_identity;
 mod rename;
+pub(crate) mod spec_refs;
 mod rename_transaction;
 mod title_sync;
 mod trash;
@@ -88,6 +89,28 @@ fn resolve_entry_dates(
     }
 }
 
+/// Merge body-level `spec:` links into the relationships map under conventional
+/// keys: `body_refs` (spec entities), `source_refs` (`spec:src:...`) and
+/// `knowledge_refs` (`spec:kb:...`). Existing values under those keys are
+/// preserved and de-duplicated.
+fn merge_body_spec_refs(
+    body: &str,
+    relationships: &mut std::collections::HashMap<String, Vec<String>>,
+) {
+    use spec_refs::SpecRefKind;
+    for (kind, target) in spec_refs::scan_body_spec_links(body) {
+        let key = match kind {
+            SpecRefKind::SpecEntity(_) => "body_refs",
+            SpecRefKind::Source(_) => "source_refs",
+            SpecRefKind::KnowledgeBase(_) => "knowledge_refs",
+        };
+        let bucket = relationships.entry(key.to_string()).or_default();
+        if !bucket.contains(&target) {
+            bucket.push(target);
+        }
+    }
+}
+
 /// Parse a single markdown file into a VaultEntry.
 ///
 /// If `git_dates` is provided, `created_at` comes from git history while
@@ -111,6 +134,7 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
     let snippet = extract_snippet(&content);
     let word_count = count_body_words(&content);
     let outgoing_links = extract_outgoing_links(&parsed.content);
+    merge_body_spec_refs(&parsed.content, &mut relationships);
     let (fs_modified, fs_created, file_size) = read_file_metadata(path)?;
     let (modified_at, created_at) = resolve_entry_dates(fs_modified, fs_created, git_dates);
     let is_a = resolve_is_a(frontmatter.is_a);
