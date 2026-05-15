@@ -35,6 +35,8 @@ import {
 } from '@phosphor-icons/react'
 import { slugify } from '../hooks/useNoteCreation'
 import { useDragRegion } from '../hooks/useDragRegion'
+import { SpecChipStrip } from './specs/SpecChipStrip'
+import { SpecLintBadge } from './specs/SpecLintBadge'
 
 interface BreadcrumbBarProps {
   entry: VaultEntry
@@ -69,6 +71,18 @@ interface BreadcrumbBarProps {
   locale?: AppLocale
   loadingTitle?: boolean
   content?: string | null
+  /**
+   * forge-spec project root (absolute path to the directory that contains
+   * `.specs/`). When null, spec-related UI (chips, lint badge) renders
+   * nothing. TODO(forge-spec): App.tsx wiring should plumb this through
+   * once the project root resolver lands.
+   */
+  specsDir?: string | null
+  /**
+   * Callback invoked when the lint badge is clicked. Phase 4 will hook
+   * the Inspector listener; for now App.tsx can pass a no-op stub.
+   */
+  onLintBadgeClick?: () => void
 }
 
 const BREADCRUMB_ICON_CLASS = 'size-[16px]'
@@ -833,6 +847,8 @@ function BreadcrumbActions({
   actionsRef,
   overflowCollapsed,
   locale = 'en',
+  specsDir = null,
+  onLintBadgeClick,
 }: Omit<BreadcrumbBarProps, 'wordCount' | 'barRef' | 'onRenameFilename'> & {
   actionsRef: React.RefObject<HTMLDivElement | null>
   overflowCollapsed: boolean
@@ -844,6 +860,7 @@ function BreadcrumbActions({
       data-overflow-collapsed={overflowCollapsed}
       style={{ gap: 8 }}
     >
+      <SpecLintBadge entry={entry} specsDir={specsDir} locale={locale} onClick={onLintBadgeClick} />
       <FavoriteAction favorite={entry.favorite} locale={locale} onToggleFavorite={onToggleFavorite} />
       <OrganizedAction organized={entry.organized} locale={locale} onToggleOrganized={onToggleOrganized} />
       <OverflowToolbarAction>
@@ -1007,6 +1024,7 @@ function BreadcrumbTitle({
           ? <BreadcrumbTitleSkeleton />
           : <FilenameCrumb content={content} entry={entry} locale={locale} onRenameFilename={onRenameFilename} />}
       </div>
+      {!loadingTitle && <SpecChipStrip entry={entry} locale={locale} />}
     </div>
   )
 }
