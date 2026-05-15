@@ -52,3 +52,13 @@ export async function listTasks(
 ): Promise<TaskEntry[]> {
   return tauriCall<TaskEntry[]>('spec_list_tasks', { specsDir, state: state ?? null })
 }
+
+export interface AuxRootEntry {
+  label: string
+  path: string
+}
+
+/** Resolve the configured auxiliary roots (forge-spec projects) for a vault. */
+export async function resolveAuxRoots(vaultPath: string): Promise<AuxRootEntry[]> {
+  return tauriCall<AuxRootEntry[]>('spec_resolve_aux_roots', { vaultPath })
+}

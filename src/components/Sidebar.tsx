@@ -24,6 +24,8 @@ import {
   ViewsSection,
 } from './sidebar/SidebarSections'
 import { AuxRootSections } from './sidebar/AuxRootSections'
+import { SpecsSection, type SpecView } from './sidebar/SpecsSection'
+import { hasAuxRootEntries } from '../utils/specs/auxRootsConfig'
 import type { AuxRootSection } from '../utils/sidebarSections'
 import {
   SidebarCreatableLoadingSection,
@@ -76,6 +78,11 @@ interface SidebarProps {
   canGoBack?: boolean
   canGoForward?: boolean
   loading?: boolean
+  /** Opens a full-tab spec view (overview / tasks / lint). Only invoked when
+   *  at least one entry has a `rootLabel` (i.e. forge-spec is configured). */
+  onOpenSpecView?: (view: SpecView) => void
+  /** Currently-open spec view, used to highlight the active sidebar action. */
+  activeSpecView?: SpecView | null
 }
 
 interface SidebarNavigationProps extends Pick<
@@ -467,10 +474,25 @@ function SidebarAuxRootNavigation({
   )
 }
 
-function SidebarNavigation(props: SidebarNavigationProps) {
+interface SidebarNavigationExtras {
+  hasSpecRoots: boolean
+  onOpenSpecView?: (view: SpecView) => void
+  activeSpecView?: SpecView | null
+}
+
+function SidebarNavigation(props: SidebarNavigationProps & SidebarNavigationExtras) {
   return (
     <nav className="flex-1 overflow-y-auto">
       <SidebarTopNavigation {...props} />
+      {props.hasSpecRoots && props.onOpenSpecView && (
+        <SpecsSection
+          collapsed={false}
+          onToggle={() => {}}
+          onOpenSpecView={props.onOpenSpecView}
+          activeView={props.activeSpecView ?? null}
+          locale={props.locale}
+        />
+      )}
       <SidebarViewAndTypeNavigation {...props} />
       <SidebarAuxRootNavigation
         auxRootSections={props.auxRootSections}
@@ -634,6 +656,9 @@ function SidebarRuntimeNavigation({
       typeInteractions={runtime.typeInteractions}
       isSectionVisible={runtime.isSectionVisible}
       toggleVisibility={runtime.toggleVisibility}
+      hasSpecRoots={hasAuxRootEntries(props.entries)}
+      onOpenSpecView={props.onOpenSpecView}
+      activeSpecView={props.activeSpecView}
     />
   )
 }

@@ -355,6 +355,10 @@ function handleMoveNoteToFolder(args: {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock handler map accepts heterogeneous arg types
 export const mockHandlers: Record<string, (args: any) => any> = {
   list_vault: () => MOCK_ENTRIES,
+  spec_resolve_aux_roots: () => [],
+  spec_list_specs: () => [],
+  spec_list_tasks: () => [],
+  spec_get_lint_results: () => [],
   list_vault_folders: () => [],
   list_views: () => [],
   save_view_cmd: () => {},

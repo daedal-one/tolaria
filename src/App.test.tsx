@@ -1420,4 +1420,46 @@ describe('App', () => {
       })
     }
   })
+
+  describe('spec-view tabs', () => {
+    function withRootLabel<T extends { rootLabel?: string }>(entry: T, label: string): T {
+      return { ...entry, rootLabel: label }
+    }
+
+    it('shows the spec sidebar actions only when an aux root is configured', async () => {
+      // Default vault (no aux roots) — section is hidden.
+      const { unmount } = render(<App />)
+      await screen.findByText('All Notes')
+      expect(screen.queryByText('SPECS')).not.toBeInTheDocument()
+      unmount()
+
+      // Vault with aux-root-tagged entries — section shows.
+      mockCommandResults.list_vault = mockEntries.map((entry) =>
+        withRootLabel(entry as { rootLabel?: string }, 'Auth Specs'),
+      )
+      render(<App />)
+      await screen.findByText('All Notes')
+      await screen.findByText('SPECS')
+      expect(screen.getByRole('button', { name: 'All specs' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Task board' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Lint' })).toBeInTheDocument()
+    }, 10000)
+
+    it('opens the Task board view when its sidebar action is clicked', async () => {
+      mockCommandResults.list_vault = mockEntries.map((entry) =>
+        withRootLabel(entry as { rootLabel?: string }, 'Auth Specs'),
+      )
+      mockCommandResults.spec_resolve_aux_roots = () => [
+        { label: 'Auth Specs', path: '/tmp/auth-specs' },
+      ]
+      mockCommandResults.spec_list_tasks = () => []
+
+      render(<App />)
+      await screen.findByText('SPECS')
+      fireEvent.click(screen.getByRole('button', { name: 'Task board' }))
+
+      const pane = await screen.findByTestId('spec-view-pane')
+      expect(pane).toHaveAttribute('data-spec-view', 'tasks')
+    }, 10000)
+  })
 })

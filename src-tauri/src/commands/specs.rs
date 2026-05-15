@@ -1,9 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use crate::vault::aux_roots::load_aux_roots;
+
 use super::expand_tilde;
 
 // ── Data transfer types ────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuxRootEntry {
+    pub label: String,
+    pub path: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpecSummary {
@@ -380,6 +388,22 @@ pub fn spec_list_tasks(
     Ok(tasks)
 }
 
+/// Resolve the auxiliary roots (forge-spec projects) configured for a vault.
+/// Wraps `load_aux_roots` so the frontend can discover `specsDir` values to
+/// pass to the other `spec_*` commands.
+#[tauri::command]
+pub fn spec_resolve_aux_roots(vault_path: String) -> Result<Vec<AuxRootEntry>, String> {
+    let expanded = expand_tilde(&vault_path);
+    let roots = load_aux_roots(Path::new(expanded.as_ref()));
+    Ok(roots
+        .into_iter()
+        .map(|r| AuxRootEntry {
+            label: r.label,
+            path: r.path.display().to_string(),
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -479,5 +503,33 @@ mod tests {
     fn unknown_spec_returns_error() {
         let result = spec_get_spec(fixture_path(), "REQ:nope/does-not-exist".to_string());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn resolve_aux_roots_returns_empty_for_unknown_vault() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let roots = spec_resolve_aux_roots(dir.path().display().to_string())
+            .expect("resolve aux roots");
+        assert!(roots.is_empty());
+    }
+
+    #[test]
+    fn resolve_aux_roots_reads_configured_projects() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let vault = dir.path().join("vault");
+        let specs = dir.path().join("the-specs");
+        std::fs::create_dir_all(vault.join("config")).unwrap();
+        std::fs::create_dir_all(&specs).unwrap();
+        std::fs::write(
+            vault.join("config/forge-spec.md"),
+            "projects:\n  - path: ../the-specs\n    label: Spec Bundle\n",
+        )
+        .unwrap();
+
+        let roots = spec_resolve_aux_roots(vault.display().to_string())
+            .expect("resolve aux roots");
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].label, "Spec Bundle");
+        assert!(roots[0].path.ends_with("the-specs"));
     }
 }

@@ -471,6 +471,7 @@ macro_rules! app_invoke_handler {
             commands::spec_get_lint_results,
             commands::spec_get_history,
             commands::spec_list_tasks,
+            commands::spec_resolve_aux_roots,
             vault_watcher::start_vault_watcher,
             vault_watcher::stop_vault_watcher
         ]

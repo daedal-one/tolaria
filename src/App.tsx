@@ -19,6 +19,10 @@ import { FeedbackDialog } from './components/FeedbackDialog'
 import { McpSetupDialog } from './components/McpSetupDialog'
 import { NoteRetargetingDialogs } from './components/note-retargeting/NoteRetargetingDialogs'
 import { StartupScreen } from './components/StartupScreen'
+import { SpecOverview, TaskBoard, LintResults } from './components/specs'
+import { Button } from '@/components/ui/button'
+import { resolvePrimaryAuxRoot } from './utils/specs/auxRootsConfig'
+import type { SpecView, SpecViewTab } from './types/specViewTab'
 import { useTelemetry } from './hooks/useTelemetry'
 import { useMcpStatus } from './hooks/useMcpStatus'
 import { useAiAgentsOnboarding } from './hooks/useAiAgentsOnboarding'
@@ -228,11 +232,37 @@ function createPulseDeletedNoteEntry(fullPath: string, relativePath: string): De
   }
 }
 
+function SpecViewPane({ tab, onClose }: { tab: SpecViewTab; onClose: () => void }) {
+  const labelKey = tab.view === 'overview'
+    ? 'sidebar.specs.overview'
+    : tab.view === 'tasks'
+      ? 'sidebar.specs.tasks'
+      : 'sidebar.specs.lint'
+  return (
+    <div className="flex h-full flex-col bg-background text-foreground" data-testid="spec-view-pane" data-spec-view={tab.view}>
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2 text-sm">
+        <div className="font-medium" data-testid="spec-view-title">
+          {labelKey === 'sidebar.specs.overview' ? 'All specs' : labelKey === 'sidebar.specs.tasks' ? 'Task board' : 'Lint'}
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground" data-testid="spec-view-close">
+          Close
+        </Button>
+      </div>
+      <div className="flex-1 overflow-auto">
+        {tab.view === 'overview' && <SpecOverview specsDir={tab.specsDir} />}
+        {tab.view === 'tasks' && <TaskBoard specsDir={tab.specsDir} />}
+        {tab.view === 'lint' && <LintResults specsDir={tab.specsDir} />}
+      </div>
+    </div>
+  )
+}
+
 /** Wraps useEditorSave to also keep outgoingLinks in sync on save and on content change. */
 function App() {
   const noteWindowParams = useMemo(() => isNoteWindow() ? getNoteWindowParams() : null, [])
   const [selection, setSelection] = useState<SidebarSelection>(DEFAULT_SELECTION)
   const [noteListFilter, setNoteListFilter] = useState<NoteListFilter>('open')
+  const [specViewTab, setSpecViewTab] = useState<SpecViewTab | null>(null)
   const selectionRef = useRef<SidebarSelection>(DEFAULT_SELECTION)
   const neighborhoodHistoryRef = useRef<SidebarSelection[]>([])
   const inboxPeriod: InboxPeriod = 'all'
@@ -1275,6 +1305,17 @@ function App() {
     handleSetViewMode('editor-list')
   }, [handleSetViewMode])
 
+  const handleOpenSpecView = useCallback(async (view: SpecView) => {
+    const aux = await resolvePrimaryAuxRoot(resolvedPath ?? '')
+    if (!aux) {
+      setToastMessage('No forge-spec project configured for this vault')
+      return
+    }
+    setSpecViewTab({ kind: 'spec-view', view, specsDir: aux.path })
+  }, [resolvedPath])
+
+  const handleCloseSpecView = useCallback(() => setSpecViewTab(null), [])
+
   const handleToggleInspector = useCallback(() => {
     const nextInspectorCollapsed = !layout.inspectorCollapsed
     layout.setInspectorCollapsed(nextInspectorCollapsed)
@@ -1684,7 +1725,7 @@ function App() {
           {sidebarVisible && (
             <>
               <div className="app__sidebar" style={{ width: layout.sidebarWidth }}>
-                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={viewOrdering.onReorderViews} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} onCollapse={handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} />
+                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={viewOrdering.onReorderViews} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} onCollapse={handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} onOpenSpecView={handleOpenSpecView} activeSpecView={specViewTab?.view ?? null} />
               </div>
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>
@@ -1702,6 +1743,9 @@ function App() {
             </>
           )}
           <div className={`app__editor${aiActivity.highlightElement === 'editor' || aiActivity.highlightElement === 'tab' ? ' ai-highlight' : ''}`}>
+            {specViewTab ? (
+              <SpecViewPane tab={specViewTab} onClose={handleCloseSpecView} />
+            ) : (
             <Editor
               tabs={notes.tabs}
               activeTabPath={notes.activeTabPath}
@@ -1770,6 +1814,7 @@ function App() {
               flushPendingRawContentRef={flushPendingRawContentRef}
               locale={appLocale}
             />
+            )}
           </div>
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
