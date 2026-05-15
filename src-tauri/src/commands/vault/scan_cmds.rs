@@ -85,12 +85,16 @@ pub async fn reload_vault(
     tokio::task::spawn_blocking(move || {
         let vault_path = Path::new(&path);
         vault::invalidate_cache(vault_path);
-        let entries = vault::scan_vault_cached(vault_path)?;
-        Ok(vault::filter_gitignored_entries(
+        let mut entries = vault::scan_vault_cached(vault_path)?;
+        let filtered = vault::filter_gitignored_entries(
             vault_path,
-            entries,
+            std::mem::take(&mut entries),
             crate::settings::hide_gitignored_files_enabled(),
-        ))
+        );
+        let aux_entries = vault::scan_all_aux_roots(vault_path);
+        let mut all = filtered;
+        all.extend(aux_entries);
+        Ok(all)
     })
     .await
     .map_err(|e| format!("Task panicked: {e}"))?

@@ -20,6 +20,10 @@ struct VaultRootPaths {
 pub(crate) struct VaultBoundary {
     requested_root: PathBuf,
     canonical_root: PathBuf,
+    /// Canonicalized auxiliary roots — additional directories that may be
+    /// *read* through the boundary (e.g. forge-spec `.specs/`). Writes
+    /// remain restricted to `canonical_root`.
+    aux_roots: Vec<PathBuf>,
 }
 
 impl VaultBoundary {
@@ -46,9 +50,16 @@ impl VaultBoundary {
             (None, None) => return Err(NO_ACTIVE_VAULT_ERROR.to_string()),
         };
 
+        let aux_roots = if cfg!(test) {
+            Vec::new()
+        } else {
+            crate::vault::aux_root_canonical_paths(&root.canonical)
+        };
+
         Ok(Self {
             requested_root: root.requested,
             canonical_root: root.canonical,
+            aux_roots,
         })
     }
 
@@ -95,7 +106,11 @@ impl VaultBoundary {
                 .canonicalize()
                 .map_err(|_| "File does not exist".to_string())?
         };
-        self.ensure_within_root(&canonical)?;
+        if allow_missing_leaf {
+            self.ensure_within_root(&canonical)?;
+        } else {
+            self.ensure_within_root_or_aux(&canonical)?;
+        }
         Ok(path_to_string(&requested))
     }
 
@@ -113,6 +128,21 @@ impl VaultBoundary {
             .strip_prefix(&self.canonical_root)
             .map(|_| ())
             .map_err(|_| ACTIVE_VAULT_PATH_ERROR.to_string())
+    }
+
+    /// Like `ensure_within_root` but also accepts paths inside any
+    /// configured auxiliary root. Used for read-only access to forge-spec
+    /// `.specs/` files exposed alongside the primary vault.
+    fn ensure_within_root_or_aux(&self, candidate: &Path) -> Result<(), String> {
+        if candidate.strip_prefix(&self.canonical_root).is_ok() {
+            return Ok(());
+        }
+        for aux in &self.aux_roots {
+            if candidate.strip_prefix(aux).is_ok() {
+                return Ok(());
+            }
+        }
+        Err(ACTIVE_VAULT_PATH_ERROR.to_string())
     }
 }
 
@@ -269,9 +299,15 @@ pub(crate) fn with_validated_path<T>(
 ) -> Result<T, String> {
     if vault_path.is_none() {
         if let Some(root) = find_registered_root_for_absolute_path(path)? {
+            let aux_roots = if cfg!(test) {
+                Vec::new()
+            } else {
+                crate::vault::aux_root_canonical_paths(&root.canonical)
+            };
             let boundary = VaultBoundary {
                 requested_root: root.requested,
                 canonical_root: root.canonical,
+                aux_roots,
             };
             let validated_path = match mode {
                 ValidatedPathMode::Existing => boundary.validate_existing_path(path)?,

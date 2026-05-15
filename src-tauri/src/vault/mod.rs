@@ -1,3 +1,4 @@
+pub mod aux_roots;
 mod cache;
 mod config_seed;
 mod entry;
@@ -17,6 +18,9 @@ mod title_sync;
 mod trash;
 mod views;
 
+pub use aux_roots::{
+    aux_root_canonical_paths, aux_root_label_for, load_aux_roots, scan_all_aux_roots,
+};
 pub use cache::{invalidate_cache, scan_vault_cached};
 pub use config_seed::{
     get_ai_guidance_status, migrate_agents_md, repair_config_files, restore_ai_guidance_files,
@@ -163,6 +167,7 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
         properties,
         has_h1,
         file_kind: "markdown".to_string(),
+        root_label: None,
     })
 }
 

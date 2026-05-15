@@ -89,6 +89,11 @@ pub struct VaultEntry {
     /// Determines how the frontend renders and opens the file.
     #[serde(rename = "fileKind", default = "default_file_kind")]
     pub file_kind: String,
+    /// Label of the vault root this entry lives under. `None` = primary vault.
+    /// Auxiliary roots (e.g. forge-spec `.specs/` directories) tag their entries
+    /// so the frontend can group them in dedicated sidebar sections.
+    #[serde(rename = "rootLabel", default, skip_serializing_if = "Option::is_none")]
+    pub root_label: Option<String>,
 }
 
 fn default_file_kind() -> String {

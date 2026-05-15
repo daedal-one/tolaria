@@ -59,6 +59,10 @@ export interface VaultEntry {
   /** File kind: "markdown", "text", or "binary". Determines editor behavior.
    *  Defaults to "markdown" when absent (for backwards compatibility). */
   fileKind?: 'markdown' | 'text' | 'binary'
+  /** Label of the vault root this entry belongs to. `undefined` = primary vault.
+   *  Auxiliary roots (forge-spec `.specs/`) tag their entries so the sidebar can
+   *  group them into dedicated sections. */
+  rootLabel?: string
 }
 
 export interface WorkspaceIdentity {
