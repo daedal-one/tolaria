@@ -23,6 +23,8 @@ import {
   TypesSection,
   ViewsSection,
 } from './sidebar/SidebarSections'
+import { AuxRootSections } from './sidebar/AuxRootSections'
+import type { AuxRootSection } from '../utils/sidebarSections'
 import {
   SidebarCreatableLoadingSection,
   SidebarFavoritesLoadingSection,
@@ -81,6 +83,7 @@ interface SidebarNavigationProps extends Pick<
   | 'entries'
   | 'selection'
   | 'onSelect'
+  | 'onSelectNote'
   | 'onSelectFavorite'
   | 'onReorderFavorites'
   | 'views'
@@ -111,6 +114,7 @@ interface SidebarNavigationProps extends Pick<
   visibleSections: ReturnType<typeof useSidebarSections>['visibleSections']
   allSectionGroups: ReturnType<typeof useSidebarSections>['allSectionGroups']
   sectionIds: string[]
+  auxRootSections: AuxRootSection[]
   sensors: ReturnType<typeof useSensors>
   handleDragEnd: (event: DragEndEvent) => void
   sectionProps: SidebarSectionProps
@@ -441,11 +445,39 @@ function SidebarViewAndTypeNavigation(props: SidebarNavigationProps) {
   )
 }
 
+function SidebarAuxRootNavigation({
+  auxRootSections,
+  selection,
+  onSelectNote,
+  locale,
+}: {
+  auxRootSections: AuxRootSection[]
+  selection: SidebarNavigationProps['selection']
+  onSelectNote?: SidebarNavigationProps['onSelectNote']
+  locale?: SidebarNavigationProps['locale']
+}) {
+  if (auxRootSections.length === 0) return null
+  return (
+    <AuxRootSections
+      sections={auxRootSections}
+      selection={selection}
+      onSelectEntry={onSelectNote}
+      locale={locale}
+    />
+  )
+}
+
 function SidebarNavigation(props: SidebarNavigationProps) {
   return (
     <nav className="flex-1 overflow-y-auto">
       <SidebarTopNavigation {...props} />
       <SidebarViewAndTypeNavigation {...props} />
+      <SidebarAuxRootNavigation
+        auxRootSections={props.auxRootSections}
+        selection={props.selection}
+        onSelectNote={props.onSelectNote}
+        locale={props.locale}
+      />
       <SidebarFoldersNavigation
         loading={props.loading}
         folders={props.folders ?? []}
@@ -489,7 +521,7 @@ function useSidebarRuntime({
   pluralizeTypeLabels = true,
   locale = 'en',
 }: SidebarProps) {
-  const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries, pluralizeTypeLabels)
+  const { typeEntryMap, allSectionGroups, visibleSections, sectionIds, auxRootSections } = useSidebarSections(entries, pluralizeTypeLabels)
   const { activeCount, archivedCount } = useEntryCounts(entries, allNotesFileVisibility)
   const { collapsed: groupCollapsed, toggle: toggleGroup } = useSidebarCollapsed()
   const typeInteractions = useSidebarTypeInteractions({
@@ -538,6 +570,7 @@ function useSidebarRuntime({
     activeCount,
     allSectionGroups,
     archivedCount,
+    auxRootSections,
     groupCollapsed,
     handleDragEnd,
     isSectionVisible,
@@ -564,6 +597,7 @@ function SidebarRuntimeNavigation({
       entries={props.entries}
       selection={props.selection}
       onSelect={props.onSelect}
+      onSelectNote={props.onSelectNote}
       onSelectFavorite={props.onSelectFavorite}
       onReorderFavorites={props.onReorderFavorites}
       views={props.views}
@@ -593,6 +627,7 @@ function SidebarRuntimeNavigation({
       visibleSections={runtime.visibleSections}
       allSectionGroups={runtime.allSectionGroups}
       sectionIds={runtime.sectionIds}
+      auxRootSections={runtime.auxRootSections}
       sensors={runtime.sensors}
       handleDragEnd={runtime.handleDragEnd}
       sectionProps={runtime.sectionProps}

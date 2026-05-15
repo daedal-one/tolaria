@@ -13,6 +13,8 @@ import { isSelectionActive } from '../SidebarParts'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
 import { SIDEBAR_ITEM_PADDING, SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { EntryStatusDot } from './EntryStatusDot'
+import { EntryHoverPopover } from './EntryHoverPopover'
 
 const FAVORITE_TYPE_ICON_MAP: Record<string, string> = {
   Project: 'wrench',
@@ -43,11 +45,13 @@ function SortableFavoriteItem({
   isActive,
   onSelect,
   typeEntryMap,
+  locale = 'en',
 }: {
   entry: VaultEntry
   isActive: boolean
   onSelect: () => void
   typeEntryMap: Record<string, VaultEntry>
+  locale?: AppLocale
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: entry.path })
   const typeEntry = entry.isA ? typeEntryMap[entry.isA] : undefined
@@ -69,9 +73,12 @@ function SortableFavoriteItem({
       >
         <div className="flex min-w-0 flex-1 items-center" style={{ gap: 4 }}>
           <NoteTitleIcon icon={icon} size={16} color={typeColor} />
-          <span className="min-w-0 truncate text-[13px] font-medium" style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}>
-            {entry.title}
-          </span>
+          <EntryStatusDot entry={entry} />
+          <EntryHoverPopover entry={entry} locale={locale}>
+            <span className="min-w-0 truncate text-[13px] font-medium" style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}>
+              {entry.title}
+            </span>
+          </EntryHoverPopover>
         </div>
       </div>
     </div>
@@ -149,6 +156,7 @@ export function FavoritesSection({
                   isActive={isSelectionActive(selection, { kind: 'entity', entry })}
                   typeEntryMap={typeEntryMap}
                   onSelect={() => handleFavoriteSelect(entry)}
+                  locale={locale}
                 />
               ))}
             </div>

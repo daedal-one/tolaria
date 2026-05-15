@@ -11,8 +11,25 @@ import { isLegacyJournalingType } from './legacyTypes'
 import { canonicalizeTypeName } from './vaultTypes'
 import {
   Wrench, Flask, Target, ArrowsClockwise,
-  Users, CalendarBlank, Tag, StackSimple,
+  Users, CalendarBlank, Tag, StackSimple, FolderOpen,
 } from '@phosphor-icons/react'
+
+/** A sub-group within an auxiliary-root sidebar section: one isA value
+ *  bound to the entries that share it. */
+export interface AuxRootSubGroup {
+  type: string
+  label: string
+  entries: VaultEntry[]
+}
+
+/** A dedicated sidebar section for a non-primary vault root (e.g. forge-spec
+ *  `.specs/`). Each section groups all entries that share a `rootLabel` and
+ *  sub-groups them by `isA`. */
+export interface AuxRootSection {
+  rootLabel: string
+  label: string
+  subGroups: AuxRootSubGroup[]
+}
 
 const BUILT_IN_SECTION_GROUPS: SectionGroup[] = [
   { label: 'Projects', type: 'Project', Icon: Wrench },
@@ -31,8 +48,11 @@ const BUILT_IN_TYPE_MAP = new Map(BUILT_IN_SECTION_GROUPS.map((sg) => [sg.type, 
 const isMarkdown = (e: VaultEntry) => e.fileKind === 'markdown' || !e.fileKind
 const isActive = (e: VaultEntry) => !e.archived
 
+const isPrimaryRootEntry = (e: VaultEntry) => e.rootLabel == null
+
 function shouldCollectActiveType(entry: VaultEntry): boolean {
   if (!isActive(entry) || !isMarkdown(entry)) return false
+  if (!isPrimaryRootEntry(entry)) return false
   return Boolean(entry.isA)
 }
 
@@ -136,4 +156,63 @@ export function sortSections(groups: SectionGroup[], typeEntryMap: Record<string
   })
 }
 
-export { BUILT_IN_SECTION_GROUPS }
+export { BUILT_IN_SECTION_GROUPS, FolderOpen as AuxRootSectionIcon }
+
+function isAuxRootCandidate(entry: VaultEntry): boolean {
+  return Boolean(entry.rootLabel) && isActive(entry) && isMarkdown(entry)
+}
+
+function appendAuxEntry(
+  byRoot: Map<string, Map<string, VaultEntry[]>>,
+  entry: VaultEntry,
+): void {
+  const rootLabel = entry.rootLabel
+  if (!rootLabel) return
+  const isA = entry.isA ?? '(untyped)'
+  const rootBucket = byRoot.get(rootLabel) ?? new Map<string, VaultEntry[]>()
+  const subBucket = rootBucket.get(isA) ?? []
+  subBucket.push(entry)
+  rootBucket.set(isA, subBucket)
+  byRoot.set(rootLabel, rootBucket)
+}
+
+function buildAuxSubGroup(
+  type: string,
+  entries: VaultEntry[],
+  typeEntryMap: Record<string, VaultEntry>,
+): AuxRootSubGroup {
+  const typeEntry = resolveTypeEntry(type, typeEntryMap)
+  return {
+    type,
+    label: typeEntry?.sidebarLabel ?? typeEntry?.title ?? type,
+    entries: [...entries].sort((a, b) => a.title.localeCompare(b.title)),
+  }
+}
+
+/**
+ * Build dedicated sidebar sections for every distinct `rootLabel` discovered
+ * across the entries. Entries within a section are sub-grouped by their `isA`
+ * (forge-spec type — requirement / invariant / adr / …).
+ *
+ * Returns an empty array when no entry has a `rootLabel` (the common case for
+ * vaults without forge-spec auxiliary roots).
+ */
+export function buildAuxRootSections(
+  entries: VaultEntry[],
+  typeEntryMap: Record<string, VaultEntry>,
+): AuxRootSection[] {
+  const byRoot = new Map<string, Map<string, VaultEntry[]>>()
+  for (const entry of entries) {
+    if (!isAuxRootCandidate(entry)) continue
+    appendAuxEntry(byRoot, entry)
+  }
+
+  const sections: AuxRootSection[] = []
+  for (const [rootLabel, subBuckets] of byRoot) {
+    const subGroups = Array.from(subBuckets, ([type, subEntries]) =>
+      buildAuxSubGroup(type, subEntries, typeEntryMap),
+    ).sort((a, b) => a.type.localeCompare(b.type))
+    sections.push({ rootLabel, label: rootLabel, subGroups })
+  }
+  return sections.sort((a, b) => a.rootLabel.localeCompare(b.rootLabel))
+}

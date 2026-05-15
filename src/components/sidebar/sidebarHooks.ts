@@ -7,7 +7,12 @@ import type { VaultEntry } from '../../types'
 import { APP_STORAGE_KEYS, LEGACY_APP_STORAGE_KEYS, getAppStorageItem } from '../../constants/appStorage'
 import { buildTypeEntryMap } from '../../utils/typeColors'
 import { countAllNotesByFilter } from '../../utils/noteListHelpers'
-import { buildDynamicSections, sortSections } from '../../utils/sidebarSections'
+import {
+  buildAuxRootSections,
+  buildDynamicSections,
+  sortSections,
+  type AuxRootSection,
+} from '../../utils/sidebarSections'
 import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 
 export type SidebarGroupKey = 'favorites' | 'views' | 'sections' | 'folders'
@@ -157,7 +162,15 @@ export function useSidebarInlineRenameInput({
   }
 }
 
-export function useSidebarSections(entries: VaultEntry[], pluralizeTypeLabels = true) {
+export interface SidebarSectionsResult {
+  typeEntryMap: Record<string, VaultEntry>
+  allSectionGroups: ReturnType<typeof buildDynamicSections>
+  visibleSections: ReturnType<typeof buildDynamicSections>
+  sectionIds: string[]
+  auxRootSections: AuxRootSection[]
+}
+
+export function useSidebarSections(entries: VaultEntry[], pluralizeTypeLabels = true): SidebarSectionsResult {
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
   const allSectionGroups = useMemo(() => {
     const sections = buildDynamicSections(entries, typeEntryMap, pluralizeTypeLabels)
@@ -168,7 +181,11 @@ export function useSidebarSections(entries: VaultEntry[], pluralizeTypeLabels = 
     [allSectionGroups, typeEntryMap],
   )
   const sectionIds = useMemo(() => visibleSections.map((group) => group.type), [visibleSections])
-  return { typeEntryMap, allSectionGroups, visibleSections, sectionIds }
+  const auxRootSections = useMemo(
+    () => buildAuxRootSections(entries, typeEntryMap),
+    [entries, typeEntryMap],
+  )
+  return { typeEntryMap, allSectionGroups, visibleSections, sectionIds, auxRootSections }
 }
 
 function loadCollapsedState(): Record<SidebarGroupKey, boolean> {

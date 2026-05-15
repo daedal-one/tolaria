@@ -618,5 +618,16 @@
   "locale.jaJP": "Japanese",
   "locale.koKR": "Korean",
   "locale.vi": "Vietnamese",
-  "locale.plPL": "Polish"
+  "locale.plPL": "Polish",
+  "sidebar.specs.section.label": "Specs",
+  "sidebar.specs.field.type": "Type",
+  "sidebar.specs.field.status": "Status",
+  "sidebar.specs.field.level": "Level",
+  "sidebar.specs.field.progress": "Progress",
+  "sidebar.specs.field.version": "Version",
+  "sidebar.specs.field.owners": "Owners",
+  "sidebar.specs.field.refines": "Refines",
+  "sidebar.specs.field.related": "Related",
+  "sidebar.specs.field.categorizedUnder": "Categorized under",
+  "sidebar.specs.field.tags": "Tags"
 }
