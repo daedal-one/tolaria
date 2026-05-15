@@ -17,6 +17,7 @@ import type { ReferencedByItem } from './InspectorPanels'
 import { EmptyInspector, InitializePropertiesPrompt, InspectorHeader, InvalidFrontmatterNotice } from './inspector/InspectorChrome'
 import { useBacklinks, useReferencedBy } from './inspector/useInspectorData'
 import { useInspectorPropertyActions } from './inspector/useInspectorPropertyActions'
+import { SpecInspectorPanel } from './specs/SpecInspectorPanel'
 import type { AppLocale } from '../lib/i18n'
 
 export type FrontmatterValue = string | number | boolean | string[] | null
@@ -38,6 +39,8 @@ interface InspectorProps {
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   onInitializeProperties?: (path: string) => void
   onToggleRawEditor?: () => void
+  specsDir?: string | null
+  onOpenSpecOverview?: () => void
   locale?: AppLocale
 }
 
@@ -192,6 +195,8 @@ function InspectorBody({
   onCreateAndOpenNote,
   onInitializeProperties,
   onToggleRawEditor,
+  specsDir,
+  onOpenSpecOverview,
   locale = 'en',
 }: Omit<InspectorProps, 'collapsed' | 'onToggle'>) {
   const referencedBy = useReferencedBy(entry, entries)
@@ -218,6 +223,12 @@ function InspectorBody({
 
   return (
     <>
+      <SpecInspectorPanel
+        entry={entry}
+        specsDir={specsDir ?? null}
+        locale={locale}
+        onOpenSpecOverview={onOpenSpecOverview}
+      />
       {supportsFrontmatter(entry) && (
         <PrimaryInspectorPanel
           entry={entry}
