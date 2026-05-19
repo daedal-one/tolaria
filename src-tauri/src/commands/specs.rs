@@ -306,7 +306,7 @@ pub fn spec_get_history(specs_dir: String, id: String) -> Result<Vec<HistoryEven
     let path = Path::new(specs_dir.as_ref());
 
     // History files are at _history/<TYPE>_<ns>_<slug>.json
-    let sanitized = id.replace(':', "_").replace('/', "_");
+    let sanitized = id.replace([':', '/'], "_");
     let history_path = path.join("_history").join(format!("{sanitized}.json"));
 
     if !history_path.exists() {
