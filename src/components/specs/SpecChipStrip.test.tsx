@@ -37,7 +37,6 @@ function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
       id: 'REQ:auth/session-expiry',
       status: 'accepted',
       level: 'MUST',
-      version: '1.2.3',
     },
     hasH1: false,
     ...overrides,
@@ -52,13 +51,12 @@ describe('SpecChipStrip', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('renders id, status, level, and version for a requirement', () => {
+  it('renders id, status, and level for a requirement', () => {
     render(<SpecChipStrip entry={makeEntry()} />)
     expect(screen.getByTestId('spec-chip-strip')).toBeInTheDocument()
     expect(screen.getByTestId('spec-id-chip')).toHaveTextContent('REQ:auth/session-expiry')
     expect(screen.getByText('accepted')).toBeInTheDocument()
     expect(screen.getByText('MUST')).toBeInTheDocument()
-    expect(screen.getByTestId('spec-version-chip')).toHaveTextContent('v1.2.3')
   })
 
   it('renders progress badge for a spec-task and no level badge', () => {
@@ -69,7 +67,6 @@ describe('SpecChipStrip', () => {
           properties: {
             id: 'TASK:auth/wire-it',
             progress: 'in-progress',
-            version: '0.1.0',
           },
         })}
       />,

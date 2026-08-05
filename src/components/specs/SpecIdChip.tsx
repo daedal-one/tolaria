@@ -38,7 +38,6 @@ function buildFieldRows(meta: SpecMeta): FieldRow[] {
   if (meta.status) rows.push({ labelKey: 'breadcrumb.spec.field.status', value: meta.status })
   if (meta.level) rows.push({ labelKey: 'breadcrumb.spec.field.level', value: meta.level })
   if (meta.progress) rows.push({ labelKey: 'breadcrumb.spec.field.progress', value: meta.progress })
-  if (meta.version) rows.push({ labelKey: 'breadcrumb.spec.field.version', value: meta.version })
   if (meta.owners.length > 0) {
     rows.push({ labelKey: 'breadcrumb.spec.field.owners', value: meta.owners.join(', ') })
   }

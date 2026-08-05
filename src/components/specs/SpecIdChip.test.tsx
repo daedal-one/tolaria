@@ -8,7 +8,6 @@ const baseMeta: SpecMeta = {
   entityType: 'requirement',
   status: 'accepted',
   level: 'MUST',
-  version: '1.0.0',
   owners: ['alice', 'bob'],
   refines: ['REQ:auth/parent'],
   related: ['REQ:auth/login'],

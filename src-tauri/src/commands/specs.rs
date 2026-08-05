@@ -20,7 +20,8 @@ pub struct SpecSummary {
     pub status: String,
     pub level: Option<String>,
     pub summary: Option<String>,
-    pub version: String,
+    pub revision: String,
+    pub spec_baseline: String,
     pub owners: Vec<String>,
     pub progress: Option<String>,
 }
@@ -32,7 +33,8 @@ pub struct SpecFull {
     pub status: String,
     pub level: Option<String>,
     pub summary: Option<String>,
-    pub version: String,
+    pub revision: String,
+    pub spec_baseline: String,
     pub owners: Vec<String>,
     pub progress: Option<String>,
     pub body: String,
@@ -97,14 +99,25 @@ pub struct TaskEntry {
     pub blocked_by: Vec<String>,
 }
 
+pub type SourceSymbol = spec_cli::symbol::SymbolCandidate;
+pub type ResolvedSource = spec_cli::symbol::ResolvedSource;
+
 // ── Helper to convert spec-cli types to DTOs ───────────────────────
 
-fn doc_to_summary(doc: &spec_cli::model::document::SpecDocument) -> SpecSummary {
+fn derived_revision(doc: &spec_cli::model::document::SpecDocument) -> String {
+    spec_cli::history::revision::for_path(&doc.source_path)
+        .map(|revision| revision.to_string())
+        .unwrap_or_else(|_| "unavailable".into())
+}
+
+fn doc_to_summary(doc: &spec_cli::model::document::SpecDocument, baseline: &str) -> SpecSummary {
     use spec_cli::model::frontmatter::TypeSpecificFields;
 
     let (level, progress) = match &doc.type_fields {
         TypeSpecificFields::Requirement { level, .. } => (Some(level.as_str().to_string()), None),
-        TypeSpecificFields::Task { progress, .. } => (None, Some(format!("{:?}", progress).to_lowercase())),
+        TypeSpecificFields::Task { progress, .. } => {
+            (None, Some(format!("{:?}", progress).to_lowercase()))
+        }
         _ => (None, None),
     };
 
@@ -114,22 +127,27 @@ fn doc_to_summary(doc: &spec_cli::model::document::SpecDocument) -> SpecSummary 
         status: doc.universal.status.as_str().to_string(),
         level,
         summary: doc.universal.summary.clone(),
-        version: doc.universal.version.clone(),
+        revision: derived_revision(doc),
+        spec_baseline: baseline.to_string(),
         owners: doc.universal.owners.clone(),
         progress,
     }
 }
 
-fn doc_to_full(doc: &spec_cli::model::document::SpecDocument) -> SpecFull {
+fn doc_to_full(doc: &spec_cli::model::document::SpecDocument, baseline: &str) -> SpecFull {
     use spec_cli::model::frontmatter::TypeSpecificFields;
 
     let (level, progress, refines) = match &doc.type_fields {
         TypeSpecificFields::Requirement { level, refines, .. } => {
             (Some(level.as_str().to_string()), None, refines.clone())
         }
-        TypeSpecificFields::Task { progress, refines, .. } => {
-            (None, Some(format!("{:?}", progress).to_lowercase()), refines.clone())
-        }
+        TypeSpecificFields::Task {
+            progress, refines, ..
+        } => (
+            None,
+            Some(format!("{:?}", progress).to_lowercase()),
+            refines.clone(),
+        ),
         _ => (None, None, Vec::new()),
     };
 
@@ -139,7 +157,8 @@ fn doc_to_full(doc: &spec_cli::model::document::SpecDocument) -> SpecFull {
         status: doc.universal.status.as_str().to_string(),
         level,
         summary: doc.universal.summary.clone(),
-        version: doc.universal.version.clone(),
+        revision: derived_revision(doc),
+        spec_baseline: baseline.to_string(),
         owners: doc.universal.owners.clone(),
         progress,
         body: doc.body_raw.clone(),
@@ -157,7 +176,11 @@ pub fn spec_list_specs(specs_dir: String) -> Result<Vec<SpecSummary>, String> {
     let registry = spec_cli::model::registry::SpecRegistry::load(Path::new(specs_dir.as_ref()))
         .map_err(|e| format!("{e:#}"))?;
 
-    Ok(registry.documents.iter().map(doc_to_summary).collect())
+    Ok(registry
+        .documents
+        .iter()
+        .map(|doc| doc_to_summary(doc, &registry.config.baseline))
+        .collect())
 }
 
 #[tauri::command]
@@ -170,7 +193,7 @@ pub fn spec_get_spec(specs_dir: String, id: String) -> Result<SpecFull, String> 
         .get_by_id(&id)
         .ok_or_else(|| format!("spec not found: {id}"))?;
 
-    Ok(doc_to_full(doc))
+    Ok(doc_to_full(doc, &registry.config.baseline))
 }
 
 #[tauri::command]
@@ -313,8 +336,8 @@ pub fn spec_get_history(specs_dir: String, id: String) -> Result<Vec<HistoryEven
         return Ok(Vec::new());
     }
 
-    let content = std::fs::read_to_string(&history_path)
-        .map_err(|e| format!("reading history: {e}"))?;
+    let content =
+        std::fs::read_to_string(&history_path).map_err(|e| format!("reading history: {e}"))?;
 
     #[derive(Deserialize)]
     struct HistoryFile {
@@ -344,10 +367,7 @@ pub fn spec_get_history(specs_dir: String, id: String) -> Result<Vec<HistoryEven
 }
 
 #[tauri::command]
-pub fn spec_list_tasks(
-    specs_dir: String,
-    state: Option<String>,
-) -> Result<Vec<TaskEntry>, String> {
+pub fn spec_list_tasks(specs_dir: String, state: Option<String>) -> Result<Vec<TaskEntry>, String> {
     let specs_dir = expand_tilde(&specs_dir);
     let registry = spec_cli::model::registry::SpecRegistry::load(Path::new(specs_dir.as_ref()))
         .map_err(|e| format!("{e:#}"))?;
@@ -388,6 +408,39 @@ pub fn spec_list_tasks(
     Ok(tasks)
 }
 
+/// List downstream language-server symbols for a repository-relative file.
+/// Custom commands are intentionally disabled at the desktop IPC boundary.
+#[tauri::command]
+pub fn spec_list_source_symbols(
+    specs_dir: String,
+    path: String,
+    query: Option<String>,
+) -> Result<Vec<SourceSymbol>, String> {
+    let specs_dir = expand_tilde(&specs_dir);
+    let service = spec_cli::symbol::SymbolService::new(Path::new(specs_dir.as_ref()), false)
+        .map_err(|error| error.to_string())?;
+    service
+        .list_symbols(&path, query.as_deref())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn spec_resolve_source_reference(
+    specs_dir: String,
+    reference: String,
+) -> Result<ResolvedSource, String> {
+    let specs_dir = expand_tilde(&specs_dir);
+    let parsed = spec_cli::parse::references::parse_spec_url(&reference)
+        .ok_or_else(|| format!("invalid spec reference: {reference}"))?;
+    let spec_cli::model::reference::SpecReference::Source(source) = parsed else {
+        return Err("expected a spec:src: reference".into());
+    };
+    spec_cli::symbol::SymbolService::new(Path::new(specs_dir.as_ref()), false)
+        .map_err(|error| error.to_string())?
+        .resolve(&source)
+        .map_err(|error| error.to_string())
+}
+
 /// Resolve the auxiliary roots (forge-spec projects) configured for a vault.
 /// Wraps `load_aux_roots` so the frontend can discover `specsDir` values to
 /// pass to the other `spec_*` commands.
@@ -415,7 +468,11 @@ mod tests {
     #[test]
     fn list_specs_returns_example_fixture() {
         let summaries = spec_list_specs(fixture_path()).expect("list_specs failed");
-        assert!(summaries.len() >= 6, "expected >=6 specs, got {}", summaries.len());
+        assert!(
+            summaries.len() >= 6,
+            "expected >=6 specs, got {}",
+            summaries.len()
+        );
 
         let ids: Vec<&str> = summaries.iter().map(|s| s.id.as_str()).collect();
         assert!(ids.contains(&"REQ:auth/session-expiry"));
@@ -450,46 +507,45 @@ mod tests {
         let has_refines_edge = graph.edges.iter().any(|e| {
             e.from == "REQ:auth/session-expiry" && e.to.starts_with("REQ:auth/session-management")
         });
-        assert!(has_refines_edge, "missing session-expiry → session-management edge");
+        assert!(
+            has_refines_edge,
+            "missing session-expiry → session-management edge"
+        );
     }
 
     #[test]
     fn categorization_graph_has_topic_edges() {
-        let graph = spec_get_categorization_graph(fixture_path())
-            .expect("categorization graph failed");
+        let graph =
+            spec_get_categorization_graph(fixture_path()).expect("categorization graph failed");
         assert!(!graph.nodes.is_empty());
         // session-expiry is categorized under TOPIC:topics/auth
         let has_topic_edge = graph
             .edges
             .iter()
             .any(|e| e.from == "REQ:auth/session-expiry" && e.to == "TOPIC:topics/auth");
-        assert!(has_topic_edge, "missing categorization edge to TOPIC:topics/auth");
+        assert!(
+            has_topic_edge,
+            "missing categorization edge to TOPIC:topics/auth"
+        );
     }
 
     #[test]
     fn coverage_returns_clauses() {
-        let coverage = spec_get_coverage(
-            fixture_path(),
-            "REQ:auth/session-management".to_string(),
-        )
-        .expect("coverage failed");
+        let coverage = spec_get_coverage(fixture_path(), "REQ:auth/session-management".to_string())
+            .expect("coverage failed");
         assert!(!coverage.is_empty(), "expected at least one clause");
         let ids: Vec<&str> = coverage.iter().map(|c| c.clause_id.as_str()).collect();
         assert!(ids.iter().any(|id| id.contains("c-lifetime")));
     }
 
     #[test]
-    fn lint_results_include_r018_and_r019() {
+    fn lint_results_return_structured_example_diagnostics() {
         let diags = spec_get_lint_results(fixture_path()).expect("lint failed");
         let codes: Vec<&str> = diags.iter().map(|d| d.code.as_str()).collect();
-        assert!(codes.contains(&"R018"), "expected R018 in {codes:?}");
-        assert!(codes.contains(&"R019"), "expected R019 in {codes:?}");
-
-        let r018 = diags.iter().find(|d| d.code == "R018").unwrap();
-        assert_eq!(r018.severity, "error");
-
-        let r019 = diags.iter().find(|d| d.code == "R019").unwrap();
-        assert_eq!(r019.severity, "warning");
+        assert!(codes.contains(&"R010"), "expected R010 in {codes:?}");
+        let uncovered = diags.iter().find(|d| d.code == "R010").unwrap();
+        assert_eq!(uncovered.severity, "warning");
+        assert!(uncovered.file.ends_with("session-management.spec.md"));
     }
 
     #[test]
@@ -506,10 +562,25 @@ mod tests {
     }
 
     #[test]
+    fn resolves_repository_bounded_source_reference() {
+        let resolved = spec_resolve_source_reference(
+            fixture_path(),
+            "spec:src:example/packages/auth/session.ts:8-10".to_string(),
+        )
+        .expect("source reference should resolve");
+        assert_eq!(resolved.path, "example/packages/auth/session.ts");
+        assert!(resolved.snippet.contains("expire("));
+
+        let escaped =
+            spec_resolve_source_reference(fixture_path(), "spec:src:../outside.ts:1".to_string());
+        assert!(escaped.is_err());
+    }
+
+    #[test]
     fn resolve_aux_roots_returns_empty_for_unknown_vault() {
         let dir = tempfile::TempDir::new().unwrap();
-        let roots = spec_resolve_aux_roots(dir.path().display().to_string())
-            .expect("resolve aux roots");
+        let roots =
+            spec_resolve_aux_roots(dir.path().display().to_string()).expect("resolve aux roots");
         assert!(roots.is_empty());
     }
 
@@ -526,8 +597,7 @@ mod tests {
         )
         .unwrap();
 
-        let roots = spec_resolve_aux_roots(vault.display().to_string())
-            .expect("resolve aux roots");
+        let roots = spec_resolve_aux_roots(vault.display().to_string()).expect("resolve aux roots");
         assert_eq!(roots.len(), 1);
         assert_eq!(roots[0].label, "Spec Bundle");
         assert!(roots[0].path.ends_with("the-specs"));

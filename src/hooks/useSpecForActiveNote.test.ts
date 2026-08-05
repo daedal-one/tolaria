@@ -65,7 +65,6 @@ describe('deriveSpecMeta', () => {
         properties: {
           id: 'REQ:auth/session-expiry',
           level: 'MUST',
-          version: '0.1.0',
         },
         relationships: {
           refines: ['REQ:auth/session-management#c-lifetime'],
@@ -79,7 +78,6 @@ describe('deriveSpecMeta', () => {
       status: 'draft',
       level: 'MUST',
       progress: undefined,
-      version: '0.1.0',
       owners: [],
       refines: ['REQ:auth/session-management#c-lifetime'],
       related: ['INV:auth/no-stale-tokens'],

@@ -34,9 +34,9 @@ impl SpecRefKind {
     /// Return the stored target string, regardless of variant.
     pub fn target(&self) -> &str {
         match self {
-            SpecRefKind::SpecEntity(s)
-            | SpecRefKind::Source(s)
-            | SpecRefKind::KnowledgeBase(s) => s,
+            SpecRefKind::SpecEntity(s) | SpecRefKind::Source(s) | SpecRefKind::KnowledgeBase(s) => {
+                s
+            }
         }
     }
 }
@@ -108,9 +108,9 @@ fn is_valid_namespace(ns: &str) -> bool {
 
 fn is_valid_slug(slug: &str) -> bool {
     !slug.is_empty()
-        && slug.chars().all(|c| {
-            c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' || c == '/'
-        })
+        && slug
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' || c == '/')
 }
 
 fn is_valid_anchor(anchor: &str) -> bool {
@@ -238,9 +238,7 @@ mod tests {
         let got = extract_spec_id("spec:src:packages/auth/session.ts:42-78");
         assert_eq!(
             got,
-            Some(SpecRefKind::Source(
-                "packages/auth/session.ts:42-78".into()
-            ))
+            Some(SpecRefKind::Source("packages/auth/session.ts:42-78".into()))
         );
     }
 

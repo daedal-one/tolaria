@@ -4,12 +4,14 @@ import { listSpecs } from '@/utils/specs/api'
 import { SpecStatusBadge } from './SpecStatusBadge'
 import { LevelBadge } from './LevelBadge'
 import { TaskProgressBadge } from './TaskProgressBadge'
+import { translate, type AppLocale } from '@/lib/i18n'
 
 interface SpecOverviewProps {
   specsDir: string
+  locale?: AppLocale
 }
 
-export function SpecOverview({ specsDir }: SpecOverviewProps) {
+export function SpecOverview({ specsDir, locale = 'en' }: SpecOverviewProps) {
   const [specs, setSpecs] = useState<SpecSummary[]>([])
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
@@ -64,6 +66,8 @@ export function SpecOverview({ specsDir }: SpecOverviewProps) {
             <th className="pb-2 pr-4">Type</th>
             <th className="pb-2 pr-4">Status</th>
             <th className="pb-2 pr-4">Level</th>
+            <th className="pb-2 pr-4">{translate(locale, 'spec.overview.revision')}</th>
+            <th className="pb-2 pr-4">{translate(locale, 'spec.overview.baseline')}</th>
             <th className="pb-2">Summary</th>
           </tr>
         </thead>
@@ -78,6 +82,10 @@ export function SpecOverview({ specsDir }: SpecOverviewProps) {
               <td className="py-1.5 pr-4">
                 {spec.level && <LevelBadge level={spec.level} />}
                 {spec.progress && <TaskProgressBadge progress={spec.progress} />}
+              </td>
+              <td className="py-1.5 pr-4 font-mono text-xs">{spec.revision}</td>
+              <td className="py-1.5 pr-4 font-mono text-xs text-muted-foreground">
+                {spec.spec_baseline}
               </td>
               <td className="py-1.5 text-xs text-muted-foreground">
                 {spec.summary ?? ''}

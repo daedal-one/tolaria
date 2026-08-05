@@ -357,6 +357,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   list_vault: () => MOCK_ENTRIES,
   spec_resolve_aux_roots: () => [],
   spec_list_specs: () => [],
+  spec_list_source_symbols: () => [],
+  spec_resolve_source_reference: () => ({
+    reference: '', path: '', symbol: null, language: null, server: null,
+    locations: [], snippet: '', status: 'unverified', message: null,
+  }),
   spec_list_tasks: () => [],
   spec_get_lint_results: () => [],
   list_vault_folders: () => [],

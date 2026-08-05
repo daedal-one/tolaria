@@ -189,7 +189,10 @@ pub fn aux_root_label_for(path: &Path, vault_path: &Path) -> Option<String> {
 
 #[allow(dead_code)]
 fn label_index(roots: &[AuxRoot]) -> HashMap<&Path, &str> {
-    roots.iter().map(|r| (r.path.as_path(), r.label.as_str())).collect()
+    roots
+        .iter()
+        .map(|r| (r.path.as_path(), r.label.as_str()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -219,7 +222,10 @@ projects:
     #[test]
     fn parses_path_only_entry_derives_label() {
         let yaml = "projects:\n  - path: ../foo\n";
-        assert_eq!(parse_projects(yaml), vec![("foo".to_string(), "../foo".to_string())]);
+        assert_eq!(
+            parse_projects(yaml),
+            vec![("foo".to_string(), "../foo".to_string())]
+        );
     }
 
     #[test]
@@ -296,10 +302,7 @@ projects:
         let f = specs.join("x.md");
         fs::write(&f, "# X\n").unwrap();
 
-        assert_eq!(
-            aux_root_label_for(&f, &vault).as_deref(),
-            Some("My Specs"),
-        );
+        assert_eq!(aux_root_label_for(&f, &vault).as_deref(), Some("My Specs"),);
         assert!(aux_root_label_for(&vault.join("note.md"), &vault).is_none());
     }
 }

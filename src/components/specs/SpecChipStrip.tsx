@@ -18,17 +18,6 @@ interface SpecChipStripProps {
   locale?: AppLocale
 }
 
-function VersionChip({ version }: { version: string }) {
-  return (
-    <span
-      data-testid="spec-version-chip"
-      className="inline-flex items-center rounded-full border border-border bg-muted/30 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-    >
-      v{version}
-    </span>
-  )
-}
-
 function OwnersLabel({ owners, locale }: { owners: string[]; locale: AppLocale }) {
   if (owners.length === 0) return null
   return (
@@ -66,7 +55,6 @@ export function SpecChipStrip({ entry, locale = 'en' }: SpecChipStripProps) {
       <SpecIdChip meta={meta} locale={locale} />
       <StatusOrProgress meta={meta} />
       <LevelOrNull meta={meta} />
-      {meta.version && <VersionChip version={meta.version} />}
       <OwnersLabel owners={meta.owners} locale={locale} />
     </div>
   )

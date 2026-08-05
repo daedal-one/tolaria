@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import type { VaultEntry } from '@/types'
 import { translate, type AppLocale } from '@/lib/i18n'
 import { useSpecForActiveNote, type SpecMeta } from '@/hooks/useSpecForActiveNote'
+import { SourceSymbolPicker } from './SourceSymbolPicker'
 import {
   getCoverage,
   getLintResults,
@@ -403,6 +404,7 @@ export function SpecInspectorPanel({
         locale={locale}
         onLintFocus={onLintFocus}
       />
+      {specsDir && <SourceSymbolPicker specsDir={specsDir} locale={locale} />}
       <FooterLink meta={meta} locale={locale} onOpenSpecOverview={onOpenSpecOverview} />
     </section>
   )

@@ -42,8 +42,6 @@ export interface SpecMeta {
   level?: string
   /** Progress for tasks (pending/in-progress/done/blocked/deferred/wontdo). */
   progress?: string
-  /** Semver-style version string. */
-  version?: string
   /** Owner list (vault frontmatter stores arrays of strings). */
   owners: string[]
   /** Parent IDs this entity refines (clause-level anchors allowed). */
@@ -96,7 +94,6 @@ export function deriveSpecMeta(entry: VaultEntry | null | undefined): SpecMeta |
     status: stringField(props.status) ?? entry.status ?? undefined,
     level: stringField(props.level),
     progress: stringField(props.progress),
-    version: stringField(props.version),
     owners: stringArray(relationships.owners ?? relationships.Owners ?? props.owners),
     refines: stringArray(relationships.refines ?? relationships.Refines ?? props.refines),
     related: stringArray(

@@ -12,6 +12,8 @@ import type {
   LintDiagnostic,
   HistoryEvent,
   TaskEntry,
+  SourceSymbol,
+  ResolvedSource,
 } from './types'
 
 function tauriCall<T>(command: string, args: Record<string, unknown>): Promise<T> {
@@ -51,6 +53,28 @@ export async function listTasks(
   state?: string,
 ): Promise<TaskEntry[]> {
   return tauriCall<TaskEntry[]>('spec_list_tasks', { specsDir, state: state ?? null })
+}
+
+export async function listSourceSymbols(
+  specsDir: string,
+  path: string,
+  query?: string,
+): Promise<SourceSymbol[]> {
+  return tauriCall<SourceSymbol[]>('spec_list_source_symbols', {
+    specsDir,
+    path,
+    query: query || null,
+  })
+}
+
+export async function resolveSourceReference(
+  specsDir: string,
+  reference: string,
+): Promise<ResolvedSource> {
+  return tauriCall<ResolvedSource>('spec_resolve_source_reference', {
+    specsDir,
+    reference,
+  })
 }
 
 export interface AuxRootEntry {

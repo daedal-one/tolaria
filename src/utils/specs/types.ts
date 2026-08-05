@@ -6,7 +6,8 @@ export interface SpecSummary {
   status: string
   level: string | null
   summary: string | null
-  version: string
+  revision: string
+  spec_baseline: string
   owners: string[]
   progress: string | null
 }
@@ -65,6 +66,41 @@ export interface TaskEntry {
   assignee: string | null
   eta: string | null
   blocked_by: string[]
+}
+
+export interface SourcePosition {
+  line: number
+  character: number
+}
+
+export interface SourceRange {
+  start: SourcePosition
+  end: SourcePosition
+}
+
+export interface SourceSymbol {
+  name: string
+  qualified_name: string
+  kind: string
+  detail: string | null
+  path: string
+  reference: string
+  range: SourceRange
+  selection_range: SourceRange
+  language: string
+  server: string
+}
+
+export interface ResolvedSource {
+  reference: string
+  path: string
+  symbol: string | null
+  language: string | null
+  server: string | null
+  locations: SourceRange[]
+  snippet: string
+  status: 'verified' | 'unverified'
+  message: string | null
 }
 
 /** Entity type prefixes used in spec IDs. */
