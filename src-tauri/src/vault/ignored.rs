@@ -64,6 +64,32 @@ fn run_git_check_ignore(vault_path: &Path, relative_paths: &[String]) -> Option<
     None
 }
 
+pub(crate) fn gitignored_directory_paths(vault_path: &Path) -> HashSet<PathBuf> {
+    let output = match crate::hidden_command("git")
+        .args([
+            "status",
+            "--porcelain=v1",
+            "--ignored",
+            "--untracked-files=normal",
+            "-z",
+        ])
+        .current_dir(vault_path)
+        .output()
+    {
+        Ok(output) if output.status.success() => output,
+        _ => return HashSet::new(),
+    };
+
+    String::from_utf8_lossy(&output.stdout)
+        .split('\0')
+        .filter_map(|line| line.strip_prefix("!! "))
+        .map(|relative| relative.trim_end_matches('/'))
+        .filter(|relative| !relative.is_empty())
+        .map(|relative| vault_path.join(relative))
+        .filter(|path| path.is_dir())
+        .collect()
+}
+
 fn ignored_relative_paths(vault_path: &Path, relative_paths: &[String]) -> HashSet<String> {
     if relative_paths.is_empty() || !has_gitignore_file(vault_path) {
         return HashSet::new();

@@ -4,6 +4,7 @@ import { listSpecs } from '@/utils/specs/api'
 import { SpecStatusBadge } from './SpecStatusBadge'
 import { LevelBadge } from './LevelBadge'
 import { TaskProgressBadge } from './TaskProgressBadge'
+import { SpecDetail } from './SpecDetail'
 import { translate, type AppLocale } from '@/lib/i18n'
 
 interface SpecOverviewProps {
@@ -15,6 +16,7 @@ export function SpecOverview({ specsDir, locale = 'en' }: SpecOverviewProps) {
   const [specs, setSpecs] = useState<SpecSummary[]>([])
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [selection, setSelection] = useState<{ specsDir: string; id: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -46,6 +48,21 @@ export function SpecOverview({ specsDir, locale = 'en' }: SpecOverviewProps) {
     return <div className="p-4 text-sm text-red-600">Error loading specs: {error}</div>
   }
 
+  const selectedSpecId = selection?.specsDir === specsDir ? selection.id : null
+
+  if (selectedSpecId) {
+    return (
+      <SpecDetail
+        key={`${specsDir}:${selectedSpecId}`}
+        specsDir={specsDir}
+        id={selectedSpecId}
+        locale={locale}
+        onBack={() => setSelection(null)}
+        onSelectSpec={(id) => setSelection({ specsDir, id })}
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col gap-2 p-4">
       <div className="flex items-center gap-2">
@@ -73,8 +90,20 @@ export function SpecOverview({ specsDir, locale = 'en' }: SpecOverviewProps) {
         </thead>
         <tbody>
           {filtered.map((spec) => (
-            <tr key={spec.id} className="border-b border-border/50 hover:bg-muted/50">
-              <td className="py-1.5 pr-4 font-mono text-xs">{spec.id}</td>
+            <tr
+              key={spec.id}
+              onClick={() => setSelection({ specsDir, id: spec.id })}
+              className="cursor-pointer border-b border-border/50 hover:bg-muted/50"
+            >
+              <td className="py-1.5 pr-4 font-mono text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSelection({ specsDir, id: spec.id })}
+                  className="text-left text-foreground underline-offset-2 hover:underline focus-visible:underline"
+                >
+                  {spec.id}
+                </button>
+              </td>
               <td className="py-1.5 pr-4 text-xs">{spec.entity_type}</td>
               <td className="py-1.5 pr-4">
                 <SpecStatusBadge status={spec.status} />

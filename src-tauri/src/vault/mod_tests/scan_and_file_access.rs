@@ -95,6 +95,43 @@ fn test_scan_vault_skips_hidden_folders() {
 }
 
 #[test]
+fn test_scan_repository_vault_skips_generated_and_vendored_directories() {
+    let dir = TempDir::new().unwrap();
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    fs::create_dir_all(dir.path().join(".specs")).unwrap();
+    create_test_file(dir.path(), ".gitignore", "target/\nnode_modules/\n");
+    create_test_file(dir.path(), "README.md", "# Repository\n");
+    create_test_file(dir.path(), "target/generated.md", "# Generated\n");
+    create_test_file(dir.path(), "vendor/upstream/.git", "gitdir: elsewhere\n");
+    create_test_file(dir.path(), "vendor/upstream/upstream.md", "# Upstream\n");
+    create_test_file(dir.path(), "node_modules/package/readme.md", "# Package\n");
+
+    let entries = scan_vault(dir.path(), &HashMap::new()).unwrap();
+
+    assert_eq!(entry_filenames(&entries), vec!["README.md"]);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_scan_vault_does_not_follow_directory_symlinks() {
+    use std::os::unix::fs::symlink;
+
+    let dir = TempDir::new().unwrap();
+    let external = TempDir::new().unwrap();
+    create_test_file(dir.path(), "root.md", "# Root\n");
+    create_test_file(external.path(), "external.md", "# External\n");
+    symlink(external.path(), dir.path().join("linked-cache")).unwrap();
+
+    let entries = scan_vault(dir.path(), &HashMap::new()).unwrap();
+
+    assert_eq!(entry_filenames(&entries), vec!["root.md"]);
+}
+
+#[test]
 fn test_scan_vault_nonexistent_path() {
     let result = scan_vault(
         Path::new("/nonexistent/path/that/does/not/exist"),

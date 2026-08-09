@@ -25,7 +25,7 @@ import {
 } from './sidebar/SidebarSections'
 import { AuxRootSections } from './sidebar/AuxRootSections'
 import { SpecsSection, type SpecView } from './sidebar/SpecsSection'
-import { hasAuxRootEntries } from '../utils/specs/auxRootsConfig'
+import { useHasSpecRoots } from '../hooks/useSpecRoots'
 import type { AuxRootSection } from '../utils/sidebarSections'
 import {
   SidebarCreatableLoadingSection,
@@ -614,6 +614,8 @@ function SidebarRuntimeNavigation({
   props: SidebarProps
   runtime: ReturnType<typeof useSidebarRuntime>
 }) {
+  const hasSpecRoots = useHasSpecRoots(props.vaultRootPath, props.entries)
+
   return (
     <SidebarNavigation
       entries={props.entries}
@@ -656,7 +658,7 @@ function SidebarRuntimeNavigation({
       typeInteractions={runtime.typeInteractions}
       isSectionVisible={runtime.isSectionVisible}
       toggleVisibility={runtime.toggleVisibility}
-      hasSpecRoots={hasAuxRootEntries(props.entries)}
+      hasSpecRoots={hasSpecRoots}
       onOpenSpecView={props.onOpenSpecView}
       activeSpecView={props.activeSpecView}
     />

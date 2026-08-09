@@ -20,7 +20,8 @@ use super::{is_md_file, parse_md_file, parse_non_md_file, scan_vault, VaultEntry
 /// Bump this when VaultEntry fields change to force a full rescan.
 /// v12: fix gray_matter YAML sanitization (unquoted colons / hash comments in list items)
 /// v13: preserve plain square brackets in parsed markdown H1 titles
-const CACHE_VERSION: u32 = 13;
+/// v14: exclude ignored/nested repository infrastructure and stop following directory symlinks
+const CACHE_VERSION: u32 = 14;
 const CACHE_WRITE_LOCK_STALE_SECS: u64 = 30;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1062,6 +1063,25 @@ mod tests {
         let titles: Vec<&str> = entries2.iter().map(|e| e.title.as_str()).collect();
         assert!(titles.contains(&"Existing"));
         assert!(titles.contains(&"New Note"));
+    }
+
+    #[test]
+    fn test_update_same_commit_keeps_hidden_spec_tree_out_of_primary_cache() {
+        let (_lock, _cache_tmp, dir) = setup_git_vault();
+        let vault = dir.path();
+
+        create_test_file(vault, "existing.md", "# Existing\n");
+        create_test_file(vault, ".specs/feature.spec.md", "# Feature\n");
+        git_add_commit(vault, "init");
+
+        let entries = scan_vault_cached(vault).unwrap();
+        assert_eq!(entries.len(), 1);
+
+        create_test_file(vault, ".specs/feature.spec.md", "# Updated Feature\n");
+
+        let entries2 = scan_vault_cached(vault).unwrap();
+        assert_eq!(entries2.len(), 1);
+        assert_eq!(entries2[0].title, "Existing");
     }
 
     #[test]

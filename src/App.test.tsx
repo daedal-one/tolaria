@@ -311,6 +311,7 @@ function resetMockCommandResults() {
     get_default_vault_path: expectedDefaultVaultPath,
     list_themes: [],
     get_vault_settings: { theme: null },
+    spec_resolve_aux_roots: [],
   })
 }
 
@@ -1443,6 +1444,26 @@ describe('App', () => {
       expect(screen.getByRole('button', { name: 'All specs' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Task board' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Lint' })).toBeInTheDocument()
+    }, 10000)
+
+    it('shows spec actions from resolved roots while the generic vault scan is pending', async () => {
+      let resolveListVault: ((value: typeof mockEntries) => void) | null = null
+      mockCommandResults.list_vault = () => new Promise<typeof mockEntries>((resolve) => {
+        resolveListVault = resolve
+      })
+      mockCommandResults.spec_resolve_aux_roots = () => [
+        { label: 'codon_v3', path: '/work/codon_v3/.specs' },
+      ]
+
+      render(<App />)
+
+      expect(await screen.findByRole('button', { name: 'All specs' })).toBeInTheDocument()
+      expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
+
+      await act(async () => {
+        resolveListVault?.(mockEntries)
+        await Promise.resolve()
+      })
     }, 10000)
 
     it('opens the Task board view when its sidebar action is clicked', async () => {

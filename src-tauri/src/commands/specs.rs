@@ -441,7 +441,7 @@ pub fn spec_resolve_source_reference(
         .map_err(|error| error.to_string())
 }
 
-/// Resolve the auxiliary roots (forge-spec projects) configured for a vault.
+/// Resolve the repository-local and configured forge-spec roots for a vault.
 /// Wraps `load_aux_roots` so the frontend can discover `specsDir` values to
 /// pass to the other `spec_*` commands.
 #[tauri::command]
@@ -582,6 +582,26 @@ mod tests {
         let roots =
             spec_resolve_aux_roots(dir.path().display().to_string()).expect("resolve aux roots");
         assert!(roots.is_empty());
+    }
+
+    #[test]
+    fn resolve_aux_roots_discovers_repository_local_specs() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path().join(".specs")).unwrap();
+
+        let roots =
+            spec_resolve_aux_roots(dir.path().display().to_string()).expect("resolve aux roots");
+
+        assert_eq!(roots.len(), 1);
+        assert_eq!(
+            roots[0].path,
+            dir.path()
+                .join(".specs")
+                .canonicalize()
+                .unwrap()
+                .display()
+                .to_string()
+        );
     }
 
     #[test]

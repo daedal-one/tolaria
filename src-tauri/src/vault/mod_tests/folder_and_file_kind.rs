@@ -34,6 +34,50 @@ fn test_scan_vault_folders_excludes_hidden() {
 }
 
 #[test]
+fn test_scan_repository_folders_excludes_generated_and_vendored_directories() {
+    let dir = TempDir::new().unwrap();
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    std::fs::create_dir_all(dir.path().join(".specs")).unwrap();
+    std::fs::write(dir.path().join(".gitignore"), "target/\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("docs")).unwrap();
+    std::fs::create_dir_all(dir.path().join("target/debug")).unwrap();
+    std::fs::create_dir_all(dir.path().join("vendor/upstream")).unwrap();
+    std::fs::write(dir.path().join("docs/README.md"), "# Docs\n").unwrap();
+    std::fs::write(dir.path().join("target/debug/artifact"), "generated\n").unwrap();
+    std::fs::write(
+        dir.path().join("vendor/upstream/.git"),
+        "gitdir: elsewhere\n",
+    )
+    .unwrap();
+
+    let folders = scan_vault_folders(dir.path()).unwrap();
+    let names: Vec<&str> = folders.iter().map(|folder| folder.name.as_str()).collect();
+
+    assert_eq!(names, vec!["docs"]);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_scan_vault_folders_does_not_follow_directory_symlinks() {
+    use std::os::unix::fs::symlink;
+
+    let dir = TempDir::new().unwrap();
+    let external = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("notes")).unwrap();
+    std::fs::create_dir_all(external.path().join("nested")).unwrap();
+    symlink(external.path(), dir.path().join("linked-cache")).unwrap();
+
+    let folders = scan_vault_folders(dir.path()).unwrap();
+    let names: Vec<&str> = folders.iter().map(|folder| folder.name.as_str()).collect();
+
+    assert_eq!(names, vec!["notes"]);
+}
+
+#[test]
 fn test_scan_vault_folders_keeps_default_vault_folders_visible() {
     let dir = TempDir::new().unwrap();
     std::fs::create_dir_all(dir.path().join("attachments")).unwrap();

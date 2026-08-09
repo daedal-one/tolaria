@@ -87,6 +87,35 @@ async function installSlowVaultMock(page: Page): Promise<void> {
         handlers.list_vault = () => slowScan
         handlers.list_vault_folders = () => []
         handlers.list_views = () => []
+        handlers.spec_resolve_aux_roots = () => [
+          { label: 'Specs', path: '/vault/.specs' },
+        ]
+        handlers.spec_list_specs = () => [{
+          id: 'REQ:runtime/fast-startup',
+          entity_type: 'requirement',
+          status: 'draft',
+          level: 'MUST',
+          summary: 'Keep repository startup responsive.',
+          revision: 'r3',
+          spec_baseline: 'forge-spec-v0.2.0',
+          owners: ['runtime'],
+          progress: null,
+        }]
+        handlers.spec_get_spec = () => ({
+          id: 'REQ:runtime/fast-startup',
+          entity_type: 'requirement',
+          status: 'draft',
+          level: 'MUST',
+          summary: 'Keep repository startup responsive.',
+          revision: 'r3',
+          spec_baseline: 'forge-spec-v0.2.0',
+          owners: ['runtime'],
+          progress: null,
+          body: '# Fast startup\n\nGenerated output never blocks repository startup.',
+          source_path: '/vault/.specs/runtime/fast-startup.spec.md',
+          refines: [],
+          related: [],
+        })
         handlers.get_modified_files = () => []
         handlers.get_all_content = () => noteContent
         handlers.get_note_content = (args: unknown) => noteContent[readCommandPath(args) as keyof typeof noteContent] ?? ''
@@ -105,6 +134,7 @@ async function expectResponsiveShellWhileVaultLoads(page: Page): Promise<void> {
   await expect(page.getByTestId('sidebar-loading-views')).toBeVisible()
   await expect(page.getByTestId('sidebar-loading-types')).toBeVisible()
   await expect(page.getByTestId('sidebar-loading-folders')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'All specs' })).toBeVisible()
   await expect(page.getByTestId('note-list-loading-skeleton')).toBeVisible()
   await expect(page.getByTestId('breadcrumb-title-skeleton')).toBeVisible()
   await expect(page.getByTestId('editor-content-skeleton')).toBeVisible()
@@ -120,6 +150,11 @@ async function expectResponsiveShellWhileVaultLoads(page: Page): Promise<void> {
   await openCommandPalette(page)
   await expect(page.locator('input[placeholder="Type a command..."]')).toBeVisible()
   await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: 'All specs' }).click()
+  await page.getByRole('button', { name: 'REQ:runtime/fast-startup' }).click()
+  await expect(page.getByRole('heading', { name: 'Fast startup' })).toBeVisible()
+  await expect(page.getByText('Generated output never blocks repository startup.')).toBeVisible()
 }
 
 async function resolveVaultScan(page: Page): Promise<void> {

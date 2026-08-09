@@ -82,7 +82,7 @@ export interface AuxRootEntry {
   path: string
 }
 
-/** Resolve the configured auxiliary roots (forge-spec projects) for a vault. */
+/** Resolve the local and configured forge-spec roots for a vault. */
 export async function resolveAuxRoots(vaultPath: string): Promise<AuxRootEntry[]> {
   return tauriCall<AuxRootEntry[]>('spec_resolve_aux_roots', { vaultPath })
 }

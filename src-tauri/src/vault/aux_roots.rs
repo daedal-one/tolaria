@@ -1,7 +1,8 @@
-//! Auxiliary vault roots (e.g. forge-spec `.specs/` directories) mounted
-//! alongside the primary vault for read-only navigation. Entries from these
-//! roots are tagged with a `root_label` so the frontend can group them in
-//! dedicated sidebar sections.
+//! Forge-spec roots mounted for read-only navigation. A repository-local
+//! `<vault>/.specs/` directory is discovered automatically; additional roots
+//! can be configured alongside the primary vault. Entries from these roots
+//! are tagged with a `root_label` so the frontend can group them in dedicated
+//! sidebar sections.
 //!
 //! Configuration lives in `<vault>/config/forge-spec.md`. The file's YAML
 //! frontmatter (or first fenced block) is parsed for a `projects:` list:
@@ -13,7 +14,7 @@
 //! ```
 //!
 //! Paths are resolved relative to the vault root. Missing directories are
-//! skipped silently (forge-spec is opt-in).
+//! skipped silently.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -31,14 +32,10 @@ pub struct AuxRoot {
     pub path: PathBuf,
 }
 
-/// Parse `<vault>/config/forge-spec.md` and resolve each configured project
-/// path against the vault root. Missing files / missing directories yield
-/// an empty list.
-pub fn load_aux_roots(vault_path: &Path) -> Vec<AuxRoot> {
+fn configured_aux_roots(vault_path: &Path) -> Vec<AuxRoot> {
     let config_path = vault_path.join(CONFIG_RELATIVE_PATH);
-    let content = match std::fs::read_to_string(&config_path) {
-        Ok(c) => c,
-        Err(_) => return Vec::new(),
+    let Ok(content) = std::fs::read_to_string(&config_path) else {
+        return Vec::new();
     };
 
     parse_projects(&content)
@@ -50,15 +47,43 @@ pub fn load_aux_roots(vault_path: &Path) -> Vec<AuxRoot> {
                 vault_path.join(&raw_path)
             };
             let canonical = resolved.canonicalize().ok()?;
-            if !canonical.is_dir() {
-                return None;
-            }
-            Some(AuxRoot {
+            canonical.is_dir().then_some(AuxRoot {
                 label,
                 path: canonical,
             })
         })
         .collect()
+}
+
+fn repository_spec_root(vault_path: &Path) -> Option<AuxRoot> {
+    let path = vault_path.join(".specs").canonicalize().ok()?;
+    if !path.is_dir() {
+        return None;
+    }
+    let label = vault_path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "Specs".to_string());
+    Some(AuxRoot { label, path })
+}
+
+/// Resolve the repository-local `.specs` directory followed by any projects
+/// configured in `<vault>/config/forge-spec.md`. An explicit configuration
+/// for the local root keeps its configured label and is moved to the front.
+pub fn load_aux_roots(vault_path: &Path) -> Vec<AuxRoot> {
+    let mut roots = configured_aux_roots(vault_path);
+    let Some(local_root) = repository_spec_root(vault_path) else {
+        return roots;
+    };
+
+    if let Some(index) = roots.iter().position(|root| root.path == local_root.path) {
+        let configured_local_root = roots.remove(index);
+        roots.insert(0, configured_local_root);
+    } else {
+        roots.insert(0, local_root);
+    }
+    roots
 }
 
 /// Minimal projects-list parser. Walks the file line by line and collects
@@ -125,7 +150,7 @@ fn derive_label(path: &str) -> String {
 pub fn scan_aux_root(root: &AuxRoot) -> Vec<VaultEntry> {
     let mut entries: Vec<VaultEntry> = Vec::new();
     let walker = WalkDir::new(&root.path)
-        .follow_links(true)
+        .follow_links(false)
         .into_iter()
         .filter_entry(|e| {
             if e.file_type().is_dir() && e.depth() > 0 {
@@ -232,6 +257,68 @@ projects:
     fn missing_config_yields_empty() {
         let dir = TempDir::new().unwrap();
         assert!(load_aux_roots(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn discovers_repository_local_specs_without_config() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join(".specs")).unwrap();
+
+        let roots = load_aux_roots(dir.path());
+
+        assert_eq!(roots.len(), 1);
+        assert_eq!(
+            roots[0].label,
+            dir.path().file_name().unwrap().to_string_lossy()
+        );
+        assert_eq!(
+            roots[0].path,
+            dir.path().join(".specs").canonicalize().unwrap()
+        );
+    }
+
+    #[test]
+    fn repository_local_specs_precede_configured_auxiliary_roots() {
+        let dir = TempDir::new().unwrap();
+        let external_specs = dir.path().join("external-specs");
+        fs::create_dir_all(dir.path().join(".specs")).unwrap();
+        fs::create_dir_all(dir.path().join("config")).unwrap();
+        fs::create_dir_all(&external_specs).unwrap();
+        fs::write(
+            dir.path().join(CONFIG_RELATIVE_PATH),
+            "projects:\n  - path: external-specs\n    label: External Specs\n",
+        )
+        .unwrap();
+
+        let roots = load_aux_roots(dir.path());
+
+        assert_eq!(roots.len(), 2);
+        assert_eq!(
+            roots[0].path,
+            dir.path().join(".specs").canonicalize().unwrap()
+        );
+        assert_eq!(roots[1].label, "External Specs");
+    }
+
+    #[test]
+    fn configured_label_wins_for_repository_local_specs() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join(".specs")).unwrap();
+        fs::create_dir_all(dir.path().join("config")).unwrap();
+        fs::write(
+            dir.path().join(CONFIG_RELATIVE_PATH),
+            "projects:\n  - path: .specs\n    label: Product Contract\n",
+        )
+        .unwrap();
+
+        let roots = load_aux_roots(dir.path());
+
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].label, "Product Contract");
+        assert_eq!(
+            roots[0].path,
+            dir.path().join(".specs").canonicalize().unwrap()
+        );
     }
 
     #[test]

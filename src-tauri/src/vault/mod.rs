@@ -53,7 +53,7 @@ use parsing::{count_body_words, extract_outgoing_links, extract_snippet, extract
 use gray_matter::engine::YAML;
 use gray_matter::Matter;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 fn preferred_relationship_refs(
@@ -259,6 +259,23 @@ fn is_folder_tree_hidden_dir(name: &str) -> bool {
     is_hidden_dir(name) || FOLDER_TREE_EXCLUDED_DIRS.contains(&name)
 }
 
+fn is_repository_vault(vault_path: &Path) -> bool {
+    vault_path.join(".specs").is_dir()
+}
+
+fn is_nested_repository_dir(path: &Path, vault_path: &Path) -> bool {
+    path != vault_path && path.join(".git").exists()
+}
+
+fn has_visible_direct_file(path: &Path) -> bool {
+    fs::read_dir(path).is_ok_and(|entries| {
+        entries.flatten().any(|entry| {
+            entry.file_type().is_ok_and(|file_type| file_type.is_file())
+                && !entry.file_name().to_string_lossy().starts_with('.')
+        })
+    })
+}
+
 pub(crate) fn is_md_file(path: &Path) -> bool {
     path.is_file() && path.extension().is_some_and(|ext| ext == "md")
 }
@@ -408,8 +425,14 @@ fn scan_all_files(
     git_dates: &HashMap<String, GitDates>,
     entries: &mut Vec<VaultEntry>,
 ) {
+    let repository_vault = is_repository_vault(vault_path);
+    let gitignored_dirs = if repository_vault {
+        ignored::gitignored_directory_paths(vault_path)
+    } else {
+        Default::default()
+    };
     let walker = WalkDir::new(vault_path)
-        .follow_links(true)
+        .follow_links(false)
         .into_iter()
         .filter_entry(|e| {
             if e.file_type().is_dir() {
@@ -418,7 +441,10 @@ fn scan_all_files(
                 if e.depth() == 0 {
                     return true;
                 }
-                return !is_hidden_dir(&name);
+                return !is_hidden_dir(&name)
+                    && !(repository_vault
+                        && (gitignored_dirs.contains(e.path())
+                            || is_nested_repository_dir(e.path(), vault_path)));
             }
             true
         });
@@ -473,7 +499,12 @@ pub fn scan_vault_folders(vault_path: &Path) -> Result<Vec<FolderNode>, String> 
     if !vault_path.is_dir() {
         return Err(format!("Not a directory: {}", vault_path.display()));
     }
-    fn build_tree(dir: &Path, vault_root: &Path) -> Vec<FolderNode> {
+    fn build_tree(
+        dir: &Path,
+        vault_root: &Path,
+        repository_vault: bool,
+        gitignored_dirs: &std::collections::HashSet<PathBuf>,
+    ) -> Vec<FolderNode> {
         let mut nodes: Vec<FolderNode> = Vec::new();
         let entries = match fs::read_dir(dir) {
             Ok(d) => d,
@@ -481,18 +512,25 @@ pub fn scan_vault_folders(vault_path: &Path) -> Result<Vec<FolderNode>, String> 
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if !path.is_dir() {
+            if !entry.file_type().is_ok_and(|file_type| file_type.is_dir()) {
                 continue;
             }
             let name = entry.file_name().to_string_lossy().to_string();
-            if is_folder_tree_hidden_dir(&name) {
+            if is_folder_tree_hidden_dir(&name)
+                || (repository_vault
+                    && (gitignored_dirs.contains(&path)
+                        || is_nested_repository_dir(&path, vault_root)))
+            {
                 continue;
             }
             let rel_path = path_identity::vault_relative_path_string(vault_root, &path)
                 .unwrap_or_else(|_| {
                     path_identity::normalize_path_for_identity(&path.to_string_lossy())
                 });
-            let children = build_tree(&path, vault_root);
+            let children = build_tree(&path, vault_root, repository_vault, gitignored_dirs);
+            if repository_vault && children.is_empty() && !has_visible_direct_file(&path) {
+                continue;
+            }
             nodes.push(FolderNode {
                 name,
                 path: rel_path,
@@ -502,7 +540,18 @@ pub fn scan_vault_folders(vault_path: &Path) -> Result<Vec<FolderNode>, String> 
         nodes.sort_by_key(|node| node.name.to_lowercase());
         nodes
     }
-    Ok(build_tree(vault_path, vault_path))
+    let repository_vault = is_repository_vault(vault_path);
+    let gitignored_dirs = if repository_vault {
+        ignored::gitignored_directory_paths(vault_path)
+    } else {
+        Default::default()
+    };
+    Ok(build_tree(
+        vault_path,
+        vault_path,
+        repository_vault,
+        &gitignored_dirs,
+    ))
 }
 
 #[cfg(test)]

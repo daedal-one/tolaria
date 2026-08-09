@@ -1,12 +1,12 @@
 /**
- * Helpers for resolving the auxiliary-roots config (forge-spec projects)
- * configured for a vault. Auxiliary roots map a human-readable `label`
- * (e.g. "Auth Specs") to an absolute directory path on disk that holds the
- * spec files. The frontend uses the resolved path as the `specsDir`
- * argument to all `spec_*` Tauri commands.
+ * Helpers for resolving forge-spec project roots for a vault. A repository's
+ * local `.specs` directory is automatic; configured auxiliary roots map a
+ * human-readable `label` (e.g. "Auth Specs") to an absolute directory path.
+ * The frontend uses the resolved path as the `specsDir` argument to all
+ * `spec_*` Tauri commands.
  *
- * The source of truth lives in `<vault>/config/forge-spec.md`, parsed by the
- * `spec_resolve_aux_roots` Tauri command.
+ * Additional roots live in `<vault>/config/forge-spec.md`; the Tauri command
+ * combines those entries with an implicit `<vault>/.specs` root.
  */
 import type { VaultEntry } from '../../types'
 import { resolveAuxRoots, type AuxRootEntry } from './api'
@@ -23,7 +23,7 @@ export function hasAuxRootEntries(entries: VaultEntry[]): boolean {
 }
 
 /**
- * Pick a single primary aux root for the vault. Loads the resolved list via
+ * Pick a single primary spec root for the vault. Loads the resolved list via
  * the Tauri command, then returns the entry matching the optional `label`
  * (falling back to the first entry). Returns `null` when no aux root is
  * configured or when the command fails (e.g. running outside Tauri).

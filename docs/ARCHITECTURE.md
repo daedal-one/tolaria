@@ -91,7 +91,7 @@ flowchart LR
 3. **No orphan state updates**: Never call `updateEntry()` before the corresponding `handleUpdateFrontmatter()` or `handleDeleteProperty()` has resolved. Type metadata actions in `useEntryActions` follow this rule — create the missing type document if needed, write frontmatter first, then update state. If missing type creation collides with an existing note filename, the action stops after the existing creation toast instead of applying orphaned state.
 4. **Recovery via reload**: If state ever diverges from disk (crash, external edit, race condition), `Reload Vault` (Cmd+K → "Reload Vault") invalidates the cache and does a full filesystem rescan via the `reload_vault` Tauri command, replacing all React state. The `reload_vault_entry` command can re-read a single file.
 5. **Cache is disposable**: The `reload_vault` command deletes the cache file before rescanning, guaranteeing fresh data. The cache never contains data that doesn't exist on the filesystem.
-6. **Visibility filters are command-boundary concerns**: Gitignored-content visibility is applied after scanning/caching, before entries, folders, or search results reach React. The cache remains complete so toggling the setting can show ignored content again without rebuilding a different cache shape. Large folder filtering runs on the blocking Tokio pool and drains `git check-ignore` output while feeding stdin so broad ignore matches cannot freeze the native UI thread.
+6. **Visibility filters are command-boundary concerns**: Gitignored-content visibility is applied after scanning/caching, before entries, folders, or search results reach React. The cache remains complete so toggling the setting can show ignored content again without rebuilding a different cache shape. Repository infrastructure is the deliberate exception: when `<vault>/.specs` marks a code repository, Git-ignored directories and nested repositories are pruned before parsing and never enter the note cache. Large folder filtering runs on the blocking Tokio pool and drains `git check-ignore` output while feeding stdin so broad ignore matches cannot freeze the native UI thread.
 
 #### External Change Detection
 
@@ -102,6 +102,12 @@ The main window starts a native watcher for the active vault through `start_vaul
 Vault opening is allowed to render the main app shell while the full entry scan is still in flight. `useVaultLoader` keeps `isLoading` true until entries are ready, but folders and saved views load independently so the sidebar can become useful before the note index completes. The status bar uses the vault activity badge during this initial indexing state, while command-palette and editor-shell interactions remain mounted instead of being hidden behind the full app skeleton. The full skeleton is reserved for app-level capability checks such as the initial Git-state probe.
 
 Large-vault reproduction and keyboard QA steps live in [LARGE-VAULT-LOADING-QA.md](./LARGE-VAULT-LOADING-QA.md).
+
+#### Forge-spec Repository Mode
+
+Opening a code repository with a root `.specs/` directory enables the Specs navigation automatically. `spec_resolve_aux_roots` returns that local directory as the primary spec root, followed by any extra projects declared in `<vault>/config/forge-spec.md`; an explicit config entry for the local root can override its label without duplicating it.
+
+Spec-root resolution is independent of the generic note index. The sidebar can therefore expose **All specs**, **Task board**, and **Lint** while repository notes are still loading, and those views read directly from `.specs/`. Every row in **All specs** opens a custom detail surface backed by `spec_get_spec`, with rendered CommonMark, status metadata, revision/baseline provenance, and navigable refinement/related references. The generic vault scanner keeps `.specs/` out of ordinary notes, does not follow directory symlinks, and prunes Git-ignored directories plus nested repositories in this mode. This prevents external build caches, dependency trees, and vendored submodules from blocking or polluting the specification UI while leaving ordinary Tolaria vault folder behavior unchanged.
 
 #### Mounted Workspaces
 
